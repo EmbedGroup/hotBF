@@ -218,14 +218,14 @@ public class MotivationTest {
         Zipf zp;
         int times = 0;
 
-        monitor(Jota j, List<String> con, ArrayList<String> pro, Zipf c, Zipf p, String Con, List<String>backs) {
+        monitor(Jota j, List<String> con, ArrayList<String> pro, Zipf c, Zipf p, String Con, List<String> backs) {
             jota = j;
             consumers = con;
             providers = pro;
             zc = c;
             zp = p;
             Consumer = Con;
-            backups=backs;
+            backups = backs;
         }
 
         public void run() {
@@ -240,7 +240,7 @@ public class MotivationTest {
                 }
                 GetBalancesAndFormatResponse rsp = jota.api.getInputs(Consumer, 1, 0, 0, 10);
                 if (rsp.getTotalBalance() < 10) {
-                    System.out.println(Consumer+"NO ENOUGH BALANCE");
+                    System.out.println(Consumer + "NO ENOUGH BALANCE");
                 }
 
                 Provider = Getnode(providers, zp);
@@ -252,20 +252,20 @@ public class MotivationTest {
                 SendTransferResponse res = jota.sendValue(Consumer, valueReciver, 10);
                 Transaction tailTx = res.getTransactions().get(1);
 
-                long start=System.currentTimeMillis();
+                long start = System.currentTimeMillis();
                 while (true) {
                     // System.out.println("confirm");
                     if (jota.listener.txs.get(tailTx.getHash()) == 2) {
                         break;
                     }
-                    if(System.currentTimeMillis()-start > 60*1000){
+                    if (System.currentTimeMillis() - start > 60 * 1000) {
                         System.out.println(" SEED LOCKED,SEED REPLACE");
                         System.out.println(Consumer);
-                        if(backups.size()>0){
-                            int index=consumers.indexOf(Consumer);
+                        if (backups.size() > 0) {
+                            int index = consumers.indexOf(Consumer);
                             consumers.remove(Consumer);
                             consumers.add(index, backups.get(0));
-                            Consumer=backups.get(0);
+                            Consumer = backups.get(0);
                             backups.remove(0);
                         }
                         System.out.println(Consumer);
@@ -295,17 +295,17 @@ public class MotivationTest {
     private int providerNumber = 50;
     private int consumerNuber = 5;
     private double skewness;
-    
+
     public void DataMarketPlaceSimu(double skew) {
 
         skewness = skew;
         // int numCPUs = Runtime.getRuntime().availableProcessors();
-        
+
         Jota jota = new Jota();// listener start
         jota.startListener();
         List<String> consumers = Collections.synchronizedList(new ArrayList<>());
         ArrayList<String> providers = new ArrayList<>();
-        List<String> backup=Collections.synchronizedList(new ArrayList<>());
+        List<String> backup = Collections.synchronizedList(new ArrayList<>());
 
         Zipf zc = new Zipf(consumerNuber, skewness);
         Zipf zp = new Zipf(providerNumber, skewness);
@@ -329,8 +329,8 @@ public class MotivationTest {
                 String seed = buffer.split(";")[0];
                 providers.add(seed);
             }
-            for(int i=consumerNuber+providerNumber;i<1000 && (buffer=br.readLine())!=null;i++){
-                String seed=buffer.split(";")[0];
+            for (int i = consumerNuber + providerNumber; i < 1000 && (buffer = br.readLine()) != null; i++) {
+                String seed = buffer.split(";")[0];
                 backup.add(seed);
             }
             br.close();
@@ -341,7 +341,7 @@ public class MotivationTest {
         System.out.println("inputs before ");
         for (int i = 0; i < consumerNuber; i++) {
             GetBalancesAndFormatResponse rsp = jota.api.getInputs(consumers.get(i), 1, 0, 0, 0);
-            System.out.println(consumers.get(i)+":"+rsp.getTotalBalance());
+            System.out.println(consumers.get(i) + ":" + rsp.getTotalBalance());
             // jota.printBalance(consumers.get(i));
         }
         System.out.println("Frequency To Choose Every Consumer:");
@@ -355,8 +355,117 @@ public class MotivationTest {
 
         Thread[] ts = new Thread[consumerNuber];
         for (int i = 0; i < consumerNuber; i++) {
-            ts[i] = new monitor(jota, consumers, providers, zc, zp, consumers.get(i),backup);
+            ts[i] = new monitor(jota, consumers, providers, zc, zp, consumers.get(i), backup);
             ts[i].start();
+        }
+
+    }
+
+    public void DataMarketPlaceSimu2() {
+        double skewness = 0.0;
+        Jota jota = new Jota();// listener start
+        jota.startListener();
+        List<String> consumers = Collections.synchronizedList(new ArrayList<>());
+        ArrayList<String> providers = new ArrayList<>();
+        List<String> backup = Collections.synchronizedList(new ArrayList<>());
+
+        Zipf zc = new Zipf(consumerNuber, skewness);
+        Zipf zp = new Zipf(providerNumber, skewness);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            jota.api.AddressLocalityOutput();
+        }, "Shutdown Hook"));
+
+        File f = new File("SEED1000");
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(f));
+            String buffer;
+            for (int i = 0; i < consumerNuber; i++) {
+                buffer = br.readLine();
+                String seed = buffer.split(";")[0];
+                consumers.add(seed);
+
+            }
+            for (int i = 0; i < providerNumber; i++) {
+                buffer = br.readLine();
+                String seed = buffer.split(";")[0];
+                providers.add(seed);
+            }
+            for (int i = consumerNuber + providerNumber; i < 1000 && (buffer = br.readLine()) != null; i++) {
+                String seed = buffer.split(";")[0];
+                backup.add(seed);
+            }
+            br.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+            // TODO: handle exception
+        }
+        long start = System.currentTimeMillis();
+        while (true) {
+            if (System.currentTimeMillis() - start > 60 * 60 * 1000) {
+                break;
+            }
+            ArrayList<SendTransferResponse> ress=new ArrayList<>();
+            ArrayList<String> sendConsumers=new ArrayList<>();
+            for (int i = 0; i < consumerNuber; i++) {
+                Random r = new Random();
+                double d = r.nextDouble();
+                if (d <= zc.cumulative[i]) {
+                    // got chance to send
+                    String Consumer = consumers.get(i);
+                    GetBalancesAndFormatResponse rsp = jota.api.getInputs(Consumer, 1, 0, 0, 10);
+                    if (rsp.getTotalBalance() < 10) {
+                        System.out.println(Consumer + "NO ENOUGH BALANCE");
+                    }
+
+                    String Provider = Getnode(providers, zp);
+                    System.out.println("Got:" + Consumer + "<->" + Provider);
+                    String dataReciver = jota.getAddress(Consumer, 0, true);
+                    String valueReciver = jota.getAddress(Provider, 0, true);
+                    sendConsumers.add(Consumer);
+                    jota.sendMessage(Provider, dataReciver, "DATA");
+                    SendTransferResponse res = jota.sendValue(Consumer, valueReciver, 10);
+                    ress.add(res);
+                }
+            }
+
+            //wait until confirmed
+            long Startwait=System.currentTimeMillis();
+            while(true){
+                if(ress.isEmpty()) break;
+                if(System.currentTimeMillis()-Startwait > 60*1000){
+                    //replace unconfimed seed
+                    for(int i=0;i<sendConsumers.size();i++){
+                        System.out.println(" SEED LOCKED,SEED REPLACE");
+                        System.out.println(sendConsumers.get(i));
+                        String newconsumer="";
+                        if (backup.size() > 0) {
+                            newconsumer=backup.get(0);
+                            int index = consumers.indexOf(sendConsumers.get(i));
+                            consumers.remove(sendConsumers.get(i));
+                            consumers.add(index, backup.get(0));
+                            backup.remove(0);
+                        }
+                        System.out.println(newconsumer);
+                    }
+                    break;
+                }
+                //check confirm
+                for(int i=0;i<ress.size();i++){
+                    Transaction tailTx = ress.get(i).getTransactions().get(1);
+                    if (jota.listener.txs.get(tailTx.getHash()) == 2) {
+                        ress.remove(i);
+                        sendConsumers.remove(i);
+                        if(ress.size()==0) break;
+                    }
+                }
+                try {
+                    Thread.sleep(500);
+                } catch (Exception e) {
+                    //TODO: handle exception
+                }
+            }
+
         }
 
     }

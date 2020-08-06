@@ -1,11 +1,14 @@
+/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/Utils.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/LRUTable.java
-/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/HashProvider.java
-/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/Jota.java
+/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/Buffer.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/FilterBuilder.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/BloomFilterMemory.java
-/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/App.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/Zipf.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/MotivationTest.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/BloomFilter.java
+/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/HashProvider.java
+/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/Jota.java
+/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/HotBF.java
+/home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/App.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/GroupBloomFilter.java
 /home/quieoo/desktop/iota/hotBF/src/main/java/com/embedGroup/hotBF/Test.java

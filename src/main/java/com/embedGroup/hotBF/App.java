@@ -19,13 +19,15 @@ public class App
         //jota.DataMarkplaceSimulation();
         //jota.confirmLatencyCheck();
         //jota.zmqtest();
-        MotivationTest t=new MotivationTest();
-        t.test1();
-        //t.DataMarketPlaceSimu(0.0);
-        //Test t=new Test();
-        
+        //MotivationTest t=new MotivationTest();
+        //t.test1();
+        //t.DataMarketPlaceSimu(4.0);
+        Test t=new Test();
+        t.linkedqueueTest();
         //t.RandomnessTest();
         //GroupBloomFilter g=new GroupBloomFilter(4*1024*8, 2, 0.001);
+        
+
     }
 }
 

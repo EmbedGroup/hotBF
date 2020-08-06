@@ -2,7 +2,9 @@ package com.embedGroup.hotBF;
 
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Test {
 
@@ -159,4 +161,17 @@ public class Test {
         }
     }
     
+    //Tail means latest used，head means oldest
+    public void linkedqueueTest(){
+        ConcurrentLinkedQueue<String> q=new ConcurrentLinkedQueue<>();
+        q.add("a");//add to tail
+        q.add("b");
+
+        Iterator<String> it=q.iterator();//iterator from head to tail
+        while(it.hasNext()){
+            System.out.println(it.next());
+        }
+
+        
+    }
 }
