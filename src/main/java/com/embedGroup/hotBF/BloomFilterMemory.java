@@ -178,7 +178,7 @@ public class BloomFilterMemory<T> implements BloomFilter<T> {
      * @param offset
      * @param size
      */
-    public void load(String path, int offset,int size) {
+    public void load(String path, long offset,int size) {
         try {
             File f=new File(path);
             RandomAccessFile rf=new RandomAccessFile(f, "r");
@@ -194,8 +194,14 @@ public class BloomFilterMemory<T> implements BloomFilter<T> {
             e.printStackTrace();
         }
     }
-
-    public void save(String path,int offset,int size){
+    public void setBloom(byte[] newBloom){
+        if(newBloom.length != getSize()){
+            System.out.println("ERROR:Bloom length mismatch");
+            return;
+        }
+        bloom=byteArray2BitSet(newBloom);
+    }
+    public void save(String path,long offset,int size){
         try {
             File f=new File(path);
             if(!f.exists()){

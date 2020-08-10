@@ -322,11 +322,13 @@ public interface BloomFilter<T> extends Cloneable, Serializable {
      */
     public void load(String path);
 
-    public void load(String path,int offset,int size);
+    public void load(String path,long offset,int size);
 
-    public void save(String path,int offset,int size);
+    public void save(String path,long offset,int size);
 
     public  byte[] bitSet2ByteArray(BitSet bitSet);
 
     public  BitSet byteArray2BitSet(byte[] bytes);
+
+    public void setBloom(byte[] newBloom);
 }

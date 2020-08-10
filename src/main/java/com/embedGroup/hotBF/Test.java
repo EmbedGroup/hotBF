@@ -1,9 +1,14 @@
 package com.embedGroup.hotBF;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.RandomAccessFile;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Test {
@@ -125,53 +130,94 @@ public class Test {
         public void run() {
             try {
                 for (int i = 0; i < 1000000; i++) {
-                    table.put(String.valueOf(id)+"+"+String.valueOf(i),String.valueOf(System.currentTimeMillis()));
-                    double a=3.33;
-                    for(int j=0;j<100;j++){
-                        a*=a;
+                    table.put(String.valueOf(id) + "+" + String.valueOf(i), String.valueOf(System.currentTimeMillis()));
+                    double a = 3.33;
+                    for (int j = 0; j < 100; j++) {
+                        a *= a;
                     }
-                    table.MoveToFirst(String.valueOf(id)+"+"+String.valueOf(i));
-                    for(int j=0;j<100;j++){
-                        a*=a;
+                    table.MoveToFirst(String.valueOf(id) + "+" + String.valueOf(i));
+                    for (int j = 0; j < 100; j++) {
+                        a *= a;
                     }
                     table.RemoveTail();
-                    
+
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                
+
             }
 
         }
     }
-    public void LRUThreadTest(){
-        for(int i=0;i<10;i++){
-            Thread t=new LRUThread(i);
+
+    public void LRUThreadTest() {
+        for (int i = 0; i < 10; i++) {
+            Thread t = new LRUThread(i);
             t.start();
         }
 
         table.PrintList();
     }
 
-    
-    public void RandomnessTest(){
-        Random r=new Random();
-        for(int i=0;i<1000;i++){
+    public void RandomnessTest() {
+        Random r = new Random();
+        for (int i = 0; i < 1000; i++) {
             System.out.println(r.nextDouble());
         }
     }
-    
-    //Tail means latest used，head means oldest
-    public void linkedqueueTest(){
-        ConcurrentLinkedQueue<String> q=new ConcurrentLinkedQueue<>();
-        q.add("a");//add to tail
+
+    // Tail means latest used，head means oldest
+    public void linkedqueueTest() {
+        ConcurrentLinkedQueue<String> q = new ConcurrentLinkedQueue<>();
+        q.add("a");// add to tail
+        q.add("b");
+        q.add("c");
+
+        // move "b" to tail
+        q.remove("b");
         q.add("b");
 
-        Iterator<String> it=q.iterator();//iterator from head to tail
-        while(it.hasNext()){
+        // check head
+        System.out.println(q.peek());
+
+        Iterator<String> it = q.iterator();// iterator from head to tail
+        while (it.hasNext()) {
             System.out.println(it.next());
         }
 
-        
+        ConcurrentLinkedDeque<String> dq = new ConcurrentLinkedDeque<>();
+        dq.add("a");
+        dq.add("b");
+        dq.add("c");
+
+        dq.remove("b");
+        dq.add("b");
+        it = dq.iterator();
+        while (it.hasNext()) {
+            System.out.println(it.next());
+        }
+        System.out.println(dq.peekLast());
+
+    }
+
+    public static void filetest(){
+        File f=new File("test");
+        try{
+            if(!f.exists()) f.createNewFile();
+            BufferedWriter bw=new BufferedWriter(new FileWriter(f));
+            bw.write(1+" "+2+" "+3+"\n");
+            bw.write(4+" ");
+
+            bw.close();
+            BufferedReader br=new BufferedReader(new FileReader(f));
+            int x=br.read();
+            int y=br.read();
+            int z=br.read();
+            int t=br.read();
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
+
     }
 }

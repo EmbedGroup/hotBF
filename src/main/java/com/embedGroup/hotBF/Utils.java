@@ -26,14 +26,13 @@ public class Utils {
     public static int TrytesToInt(String addr,int length){
         int result=0;
         for(int i=0;i<length;i++){
-            char k=addr.charAt(length-i-1);
+            char k=addr.charAt(i);
             if(k=='9'){
                 result+=0;
             }else{
                 result+=(int)(k-'A')+1;
             }
-
-            result*=27;
+            if(i!=length-1)   result*=27;
         }
         return result;
     }
