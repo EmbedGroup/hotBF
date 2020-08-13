@@ -74,6 +74,10 @@ public class BloomFilterMemory<T> implements BloomFilter<T> {
     public synchronized BitSet getBitSet() {
         return (BitSet) bloom.clone();
     }
+
+    public byte[] getBloomAsByteArray(){
+        return bitSet2ByteArray(bloom);
+    }
     public BitSet getRealBitSet(){
         return bloom;
     }
@@ -218,7 +222,7 @@ public class BloomFilterMemory<T> implements BloomFilter<T> {
         }
     }
 
-    public  byte[] bitSet2ByteArray(BitSet bitSet) {
+    public byte[] bitSet2ByteArray(BitSet bitSet) {
         byte[] bytes = new byte[bitSet.size() / 8];
         for (int i = 0; i < bitSet.size(); i++) {
             int index = i / 8;

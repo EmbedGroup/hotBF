@@ -327,7 +327,7 @@ public interface BloomFilter<T> extends Cloneable, Serializable {
     public void save(String path,long offset,int size);
 
     public  byte[] bitSet2ByteArray(BitSet bitSet);
-
+    public byte[] getBloomAsByteArray();
     public  BitSet byteArray2BitSet(byte[] bytes);
 
     public void setBloom(byte[] newBloom);

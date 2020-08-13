@@ -2,6 +2,7 @@ package com.embedGroup.hotBF;
 
 import java.io.BufferedWriter;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -15,8 +16,9 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  */
 public class GroupBloomFilter {
     private int index;
-    //public CopyOnWriteArrayList<BloomFilter<String>> Group =new CopyOnWriteArrayList<>();//Thread safety for write and delete operations
-    public ConcurrentHashMap<Integer,BloomFilter<String>> Group=new ConcurrentHashMap<>();
+    // public CopyOnWriteArrayList<BloomFilter<String>> Group =new
+    // CopyOnWriteArrayList<>();//Thread safety for write and delete operations
+    public ConcurrentHashMap<Integer, BloomFilter<String>> Group = new ConcurrentHashMap<>();
     private int BFUsize;
     private int HashFunctions;
     private double P;
@@ -25,97 +27,127 @@ public class GroupBloomFilter {
 
     private int Size;// M=BFUsize*BFUnits
     private int Capacity;// M*(ln2)^2 / |lnP|
-    private int Entities;//current number of enttities inseted to group bloom filter 
+    private int Entities;// current number of enttities inseted to group bloom filter
     HotBF hot;
 
-    private boolean[] Active;//true if BFU in memory
-    private int Actives;//BFU numbers in memory
+    private boolean[] Active;// true if BFU in memory
+    private int Actives;// BFU numbers in memory
 
+    // Deque
+    ConcurrentLinkedDeque<Integer> BFULRU = new ConcurrentLinkedDeque<>();// BFULRU was born empty
 
-    //Deque
-    ConcurrentLinkedDeque<Integer> BFULRU=new ConcurrentLinkedDeque<>();//BFULRU was born empty
-    GroupBloomFilter(int bfusize, int hashFunctions, double p,HotBF hotbf,int Index) {
+    GroupBloomFilter(int bfusize, int hashFunctions, double p, HotBF hotbf, int Index) {
         BFUsize = bfusize;
         HashFunctions = hashFunctions;
         P = p;
-        hot=hotbf;
-        index=Index;
+        hot = hotbf;
+        index = Index;
 
         int K = (int) (Math.ceil(Math.log(1 / P) / Math.log(2)));
-        
+
         BFUnits = K / hashFunctions;
         Size = BFUsize * BFUnits;
         double e = 2.7182818285;
-        Capacity = (int) (Size * Math.pow((Math.log(2) / Math.log(e)),2) / Math.abs((Math.log(P) / Math.log(e))) );
+        Capacity = (int) (Size * Math.pow((Math.log(2) / Math.log(e)), 2) / Math.abs((Math.log(P) / Math.log(e))));
 
-        Active=new boolean[BFUnits];
-        for(int i=0;i<BFUnits;i++)  {
-            Active[i]=false;
-            //BFULRU.add(i);
+        Active = new boolean[BFUnits];
+        for (int i = 0; i < BFUnits; i++) {
+            Active[i] = false;
+            // BFULRU.add(i);
         }
-        Actives=0;
-        
+        Actives = 0;
+
     }
+
+    GroupBloomFilter(int bfusize, int hashFunctions, int bfunits, HotBF hotbf, int Index) {
+        BFUsize = bfusize;
+        HashFunctions = hashFunctions;
+        BFUnits = bfunits;
+        hot = hotbf;
+        index = Index;
+
+        P = (double) 1 / Math.pow(2, BFUnits * hashFunctions);
+        Size = BFUsize * BFUnits;
+        double e = 2.7182818285;
+        Capacity = (int) (Size * Math.pow((Math.log(2) / Math.log(e)), 2) / Math.abs((Math.log(P) / Math.log(e))));
+
+        Active = new boolean[BFUnits];
+        for (int i = 0; i < BFUnits; i++) {
+            Active[i] = false;
+            // BFULRU.add(i);
+        }
+        Actives = 0;
+
+    }
+
     GroupBloomFilter(int bfusize, int hashFunctions, double p) {
         BFUsize = bfusize;
         HashFunctions = hashFunctions;
         P = p;
 
         int K = (int) (Math.ceil(Math.log(1 / P) / Math.log(2)));
-        
+
         BFUnits = K / hashFunctions;
         Size = BFUsize * BFUnits;
         double e = 2.7182818285;
-        Capacity = (int) (Size * Math.pow((Math.log(2) / Math.log(e)),2) / Math.abs((Math.log(P) / Math.log(e))) );
+        Capacity = (int) (Size * Math.pow((Math.log(2) / Math.log(e)), 2) / Math.abs((Math.log(P) / Math.log(e))));
 
-        Active=new boolean[BFUnits];
-        for(int i=0;i<BFUnits;i++)  Active[i]=false;
+        Active = new boolean[BFUnits];
+        for (int i = 0; i < BFUnits; i++)
+            Active[i] = false;
 
-        
     }
-    public int Size(){
+
+    public int Size() {
         return Size;
     }
-    public void iniBFULRU(){
-        for(int i=0;i<BFUnits;i++){
+
+    public void iniBFULRU() {
+        for (int i = 0; i < BFUnits; i++) {
             BFULRU.add(i);
         }
     }
-    public void setPath(String p){
-        path=p;
+
+    public void setPath(String p) {
+        path = p;
     }
-    public void loadmeta(String meta1,String meta2){
-        //meta1,entites | active
-        String[] m1=meta1.split(" ");
-        Entities=Integer.valueOf(m1[0]);
-        for(int i=1;i<m1.length;i++){
-            Active[Integer.valueOf(m1[i])]=true;
+
+    public void loadmeta(String meta1, String meta2) {
+        // meta1,entites | active
+        String[] m1 = meta1.split(" ");
+        Entities = Integer.valueOf(m1[0]);
+        for (int i = 1; i < m1.length; i++) {
+            Active[Integer.valueOf(m1[i])] = true;
             Actives++;
         }
-        //meta2 BFULRU
-        String[] m2=meta2.split(" ");
-        for(int i=0;i<m2.length;i++){
+        // meta2 BFULRU
+        String[] m2 = meta2.split(" ");
+        for (int i = 0; i < m2.length; i++) {
             BFULRU.add(Integer.valueOf(m2[i]));
         }
-        
+
     }
-    public void savemeta(BufferedWriter bw){
+
+    //
+    public void savemeta(BufferedWriter bw) {
         try {
-            bw.write(String.valueOf(Entities)+" ");
-            for(int i=0;i<BFUnits;i++){
-                if(Active[i]) bw.write(String.valueOf(i)+" ");
+            bw.write(String.valueOf(Entities) + " ");
+            for (int i = 0; i < BFUnits; i++) {
+                if (Active[i])
+                    bw.write(String.valueOf(i) + " ");
             }
             bw.write("\n");
-            Iterator<Integer> it=BFULRU.iterator();
-            while(it.hasNext()){
-                bw.write(String.valueOf(it.next())+" ");
+            Iterator<Integer> it = BFULRU.iterator();
+            while (it.hasNext()) {
+                bw.write(String.valueOf(it.next()) + " ");
             }
             bw.write("\n");
         } catch (Exception e) {
-            //TODO: handle exception
+            // TODO: handle exception
         }
-        
+
     }
+
     // hash value,output range[1,m],k hash results
     public static int[] hashCassandra(byte[] value, int m, int k) {
         int[] result = new int[k];
@@ -137,7 +169,11 @@ public class GroupBloomFilter {
         for (int i = 0; i < BFUnits; i++) {
             BloomFilter<String> BFU = Group.get(i);
             for (int j = 0; j < HashFunctions; j++) {
-                BFU.setBit(hashedValues[i * HashFunctions + j], true);
+                try {
+                    BFU.setBit(hashedValues[i * HashFunctions + j], true);
+                } catch (Exception e) {
+                    //e.printStackTrace();
+                }
             }
         }
     }
@@ -177,10 +213,19 @@ public class GroupBloomFilter {
      * @return
      */
     public boolean checkBFUWithHashValues(int BFUs, int[] hashedValues) {
+        
         BloomFilter<String> BFU = Group.get(BFUs);
 
         for (int i = 0; i < HashFunctions; i++) {
-            if (!BFU.getBit(hashedValues[BFUs * HashFunctions + i])) {
+            boolean result=true;
+            try {
+                result=BFU.getBit(hashedValues[BFUs * HashFunctions + i]);
+            } catch (Exception e) {
+                //TODO: handle exception
+                //System.out.println("BFU:"+BFU);
+
+            }
+            if (!result) {
                 return false;
             }
         }
@@ -189,150 +234,206 @@ public class GroupBloomFilter {
 
     /**
      * insert address to GroupBF,this will bring all BFUs into memory(if necessary)
+     * 
      * @param address
      */
-    public void Insert(String address){
-        //load all BFU into memory
-        for(int i=0;i<BFUnits;i++){
-            if(!Active[i]){
-                //load BFU into memory
-                BloomFilter<String> bf=new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+    public void Insert(String address) {
+        // load all BFU into memory
+        for (int i = 0; i < BFUnits; i++) {
+            if (!Active[i]) {
+                // load BFU into memory
+                BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
                 bf.load(path, getOffset(index, i), BFUsize);
                 Group.put(i, bf);
-                Active[i]=true;
+                Active[i] = true;
             }
         }
         Entities++;
-        Actives=BFUnits;
-        //note that,this time we dont't update BFULRU,cause they don't change BFU hotness
+        Actives = BFUnits;
+        // note that,this time we dont't update BFULRU,cause they don't change BFU
+        // hotness
 
-        //update BFUs
+        // update BFUs
         add(address);
-
     }
 
-    public boolean isFull(){
-        return Entities>=Capacity;
+    public boolean isFull() {
+        return Entities >= Capacity;
     }
 
-    public class mayExistsResponce{
+    public class mayExistsResponce {
         boolean exists;
         boolean loadIn;
-        mayExistsResponce(boolean r,boolean l){
-            exists=r;loadIn=l;
+
+        mayExistsResponce(boolean r, boolean l) {
+            exists = r;
+            loadIn = l;
         }
     }
-    /**
-     * First check BFUs in memory,then if needed,load in BFU to check
-     * When a negative result is obtained, move the corresponding BFU to the MRU end, otherwise no change is made
-     */
-    public mayExistsResponce mayExists(String address){
-        
-        int[] keys=getHashValues(address);
 
-        //check BFUs in memory
-        for(int i=0;i<BFUnits;i++){
-            if(Active[i]){
-                boolean result=checkBFUWithHashValues(i, keys);
-                if(result==false){
-                    
-                    //update BFULRU
-                    //Since Deque, ew can view the tail of the linked list to avoid unnecessary operations
-                    if(BFULRU.peekLast()!=i){
+    public static int loadtimes = 0;
+
+    /**
+     * First check BFUs in memory,then if needed,load in BFU to check .When a
+     * negative result is obtained, move the corresponding BFU to the MRU end,
+     * otherwise no change is made
+     */
+    public mayExistsResponce mayExists(String address) {
+
+        int[] keys = getHashValues(address);
+
+        // check BFUs in memory
+        for (int i = 0; i < BFUnits; i++) {
+            if (Active[i]) {
+                boolean result = checkBFUWithHashValues(i, keys);
+                if (result == false) {
+
+                    // update BFULRU
+                    // Since Deque, ew can view the tail of the linked list to avoid unnecessary
+                    // operations
+                    if (BFULRU.peekLast() != i) {
                         BFULRU.remove(i);
                         BFULRU.add(i);
                     }
-                    //get result;
+                    // get result;
                     return (new mayExistsResponce(false, false));
-                }       
+                }
             }
         }
-        //else,need to bring other BFUs into memory
-        if(Actives==BFUnits) return (new mayExistsResponce(true, false));
-        
-        for(int i=0;i<BFUnits;i++){
-            if(!Active[i]){
-                //read into memory
-                BloomFilter<String> bf=new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+        // else,need to bring other BFUs into memory
+        if (Actives == BFUnits)
+            return (new mayExistsResponce(true, false));
+
+        //load in needed BFUs
+        //if result is true,persist all those in memory
+        //if result is false,persist only the negative BFU
+        HashMap<Integer,BloomFilter<String>> loadedin=new HashMap<>();
+        for (int i = 0; i < BFUnits; i++) {
+            if (!Active[i]) {
+                loadtimes++;
+                // read into memory
+                BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
                 bf.load(path, getOffset(index, i), BFUsize);
-                Group.put(i, bf);
-                Active[i]=true;
+                loadedin.put(i, bf);
+                Active[i] = true;
                 Actives++;
 
-                //check
-                boolean result=true;
+                // check
+                boolean result = true;
                 for (int j = 0; j < HashFunctions; j++) {
                     if (!bf.getBit(keys[i * HashFunctions + j])) {
-                        result=false;
+                        result = false;
                         break;
                     }
                 }
 
-                if(result==false){
-                    //The one who contributed
+                if (result == false) {
+                    // The one who contributed
                     BFULRU.remove(i);
                     BFULRU.add(i);
+                    Group.put(i, bf);
                     return (new mayExistsResponce(false, true));
                 }
-                
+
             }
         }
-        
+        for(int i=0;i<BFUnits;i++){
+            BloomFilter<String> bf=loadedin.get(i);
+            if(bf!=null){
+                Group.put(i, bf);
+            }
+        }
         return (new mayExistsResponce(true, true));
     }
 
-    public long getOffset(int block,int Units){
-        return (long)block*Size+Units*BFUsize;
+    public long getOffset(int block, int Units) {
+        return (long) block * Size + Units * BFUsize;
     }
 
-    public int Actives(){
+    public BloomFilter<String> getBFU(int BFU) {
+        return Group.get(BFU);
+    }
+
+    public int Actives() {
         return Actives;
     }
-    public boolean isActive(){
-        return Actives>0;
+
+    public boolean isActive() {
+        return Actives > 0;
     }
-    public boolean isActive(int index){
+
+    public boolean isActive(int index) {
         return Active[index];
     }
 
-    //save and remove the LRU BFU
-    public boolean EliminateBFU(int numbers){
-        if(Actives < numbers){
+    public static int savetimes = 0;
+
+    // save and remove the LRU BFU
+    public int EliminateBFU(int numbers) {
+        int decresed=0;
+        if (Actives < numbers) {
             System.out.println("No Enough BFU to Eliminate");
-            return false;
+            return 0;
         }
-        Iterator<Integer> it=BFULRU.iterator();
-        int target=numbers;
-        while(target>0){
+        Iterator<Integer> it = BFULRU.iterator();
+        int target = numbers;
+        while (target > 0 && it.hasNext()) {
+            
             int t;
-            t=it.next();
-            if(Active[t]){
-                Group.get(t).save(path, getOffset(index, t), BFUsize);//save before remove
-                Group.remove(t);//remove BFU
-                Active[t]=false;
+            t = it.next();
+            BloomFilter<String> bf=Group.get(t);
+            if (Active[t] && bf!=null) {
+                //Group.get(t).save(path, getOffset(index, t), BFUsize);// save before remove
+                bf.save(path,(long)index*Size+t*BFUsize,BFUsize);
+                Group.remove(t);// remove BFU
+                savetimes++;
+                Active[t] = false;
                 Actives--;
                 target--;
+                decresed++;
             }
         }
-        return true;
+        return decresed;
     }
 
-    public void ShutDown(){
-        //save active BFU
-        for(int i=0;i<BFUnits;i++){
-            if(Active[i]){
+    public void ShutDown() {
+        // save active BFU
+        for (int i = 0; i < BFUnits; i++) {
+            if (Active[i]) {
                 Group.get(i).save(path, getOffset(index, i), BFUsize);
             }
         }
     }
 
-    public void LoadInBFU(int k){
-        if(!Active[k]){
+    public void LoadInBFU(int k) {
+        if (!Active[k]) {
             System.out.println("Load in non-active BFU");
             return;
         }
-        BloomFilter<String> bf=new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+        BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
         bf.load(path, getOffset(index, k), BFUsize);
         Group.put(k, bf);
+    }
+
+    public void print(){
+        //entitis | actives
+        //BFUs
+        System.out.printf("GBF:%d ",index);
+        System.out.printf("Entitis:%d ", Entities);
+        System.out.printf("Activs:%d",Actives);
+        System.out.printf("Active:");
+        for(int i=0;i<BFUnits;i++){
+            if(Active[i]){
+                System.out.printf("%d ",i);
+            }
+        }
+        System.out.printf("\nBFUS:");
+        
+        for(int i=0;i<BFUnits;i++){
+            if(Group.get(i)!=null){
+                System.out.printf("%d ",i);
+            }
+        }
+        System.out.printf("\n");
     }
 }

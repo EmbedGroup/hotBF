@@ -36,14 +36,17 @@ public class Jota {
 
     Jota() {
         api = new IotaAPI.Builder().protocol("http").host("127.0.0.1").port(14265).build();
-
     }
 
+    public void setHost(String protocol,String host,int port){
+        api=new IotaAPI.Builder().protocol(protocol).host(host).port(port).build();
+    }
     public void startListener() {
         listener = new ZmqLstener("127.0.0.1", "5556");
         listener.start();
     }
 
+    
     public void PrintInput(String seed) {
         try {
             GetBalancesAndFormatResponse rsp = api.getInputs(seed, 1, 0, 0, 0);
@@ -160,6 +163,8 @@ public class Jota {
             }
         }
     }
+
+    
 
     ZmqLstener listener;
 

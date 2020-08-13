@@ -11,6 +11,7 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+
 public class Test {
 
     public void RandomTest() {
@@ -220,4 +221,16 @@ public class Test {
         }
 
     }
+
+    public static void zmq(){
+        ZMQPrint p=new ZMQPrint("212.47.242.90", 5556);
+        //http://173.212.200.186:14265
+        p.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            p.lo.write();
+            p.lo.summary();
+        }, "Shutdown Hook"));
+    }
+
+
 }

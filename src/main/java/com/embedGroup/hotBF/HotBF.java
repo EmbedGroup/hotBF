@@ -9,9 +9,15 @@ import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
+import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 import com.embedGroup.hotBF.GroupBloomFilter.mayExistsResponce;
 import com.mongodb.Block;
+
+import org.iota.jota.utils.SeedRandomGenerator;
 
 public class HotBF {
     private int prefixLength;
@@ -26,6 +32,17 @@ public class HotBF {
     ConcurrentLinkedQueue<Integer> BlockLRU = new ConcurrentLinkedQueue<>();
     HashMap<Integer, GroupBloomFilter> BlockMap = new HashMap<>();
 
+    //MetricRegistry metrics = new MetricRegistry();
+    //ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
+            //.convertDurationsTo(TimeUnit.MICROSECONDS).build();
+    /**
+     * 
+     * @param prefixlength
+     * @param bfusize
+     * @param hashfunctions
+     * @param p
+     * @param limitedsize Bloom filters size in memory threhold(bits)
+     */
     public void ini(int prefixlength, int bfusize, int hashfunctions, double p, int limitedsize) {
         prefixLength = prefixlength;
         BFUsize = bfusize;
@@ -39,18 +56,13 @@ public class HotBF {
         Scales = new int[BlockNumber];
         // build block map
         // At First,no Active BFU
-        for (int i = 0; i < BlockNumber; i++) {
-            GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, P, this, i);
-            g.setPath("HBF" + 0);
-            BlockMap.put(i, g);
-        }
+        
 
         // load metadata
 
         File f = new File("HBF-Meta");
         if (!f.exists()) {
             // Bootstrap,Initialize HBF file
-
             try {
                 f.createNewFile();
                 File data = new File("HBF0");
@@ -67,10 +79,17 @@ public class HotBF {
                 // TODO: handle exception
                 e.printStackTrace();
             }
+            //initialize GroupBloomFIlters
+            for (int i = 0; i < BlockNumber; i++) {
+                GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, P, this, i);
+                g.setPath("HBF" + 0);
+                g.iniBFULRU();
+                BlockMap.put(i, g);
+            }
             // initialize BlockLRU,BFULRU
             for (int i = 0; i < BlockNumber; i++) {
                 BlockLRU.add(i);
-                BlockMap.get(i).iniBFULRU();
+                
             }
 
         } else {
@@ -85,9 +104,10 @@ public class HotBF {
                         Scaled = Scales[i];
                 }
                 // add Scaled Blocks
-                for (int i = 0; i < Scaled; i++) {
+                for (int i = 0; i <= Scaled; i++) {
                     for (int j = 0; j < BlockNumber; j++) {
-                        GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, P, this, j);
+                        //Scaled Block should with a 0.25*P
+                        GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, 5+i, this, j);
                         g.setPath("HBF" + i);
                         BlockMap.put(i * BlockNumber + j, g);
                     }
@@ -108,38 +128,49 @@ public class HotBF {
                     String meta1 = br.readLine();
                     String meta2 = br.readLine();
                     BlockMap.get(i).loadmeta(meta1, meta2);
-
                 }
                 br.close();
                 // load in active BFU
-                for (int i = 0; i < Scaled; i++) {
+                for (int i = 0; i <= Scaled; i++) {
                     // Scaled blocks are persisted in new file
                     File data = new File("HBF" + i);
                     if (!data.exists()) {
                         System.out.println("ERROR:NO DATA");
                         return;
                     }
+                    RandomAccessFile ra=new RandomAccessFile(data, "r");
+                    byte[] tmp=new byte[BFUsize];
                     for (int k = 0; k < BlockNumber; k++) {
-                        for (int j = 0; j < gb.BFUnits; j++) {
+                        GroupBloomFilter g=BlockMap.get(i*BlockNumber+k);
+                        for (int j = 0; j < g.BFUnits; j++) {
                             if (BlockMap.get(i * BlockNumber + k).isActive(j)) {
-                                BlockMap.get(i * BlockNumber + k).LoadInBFU(j);
+                                //BlockMap.get(i * BlockNumber + k).LoadInBFU(j); massive cost way
+                                BloomFilter<String> bf=new FilterBuilder(BFUsize,hashfunctions).buildBloomFilter();
+
+                                ra.seek((long)(k*g.Size())+j*BFUsize);
+                                ra.read(tmp);
+                                bf.setBloom(tmp);
+                                g.Group.put(j, bf);
                             }
                         }
                     }
+                    ra.close();
                 }
             } catch (Exception e) {
                 // TODO: handle exception
             }
 
         }
+        //reporter.start(5, TimeUnit.SECONDS);
     }
 
     // save all Active BFU
     // save metaData
     public void ShutDown() {
-        for (int i = 0; i < BlockMap.size(); i++) {
+        /*for (int i = 0; i < BlockMap.size(); i++) {
             BlockMap.get(i).ShutDown();
-        }
+        }*/
+        savaData();
 
         File meta = new File("HBF-Meta");
         try {
@@ -169,6 +200,42 @@ public class HotBF {
         }
     }
 
+    public void WarmUp(){
+        //bring all of GBF's first BFU into memory
+        //RAW bootstrap
+        int threshold=limitedSize/BFUsize;
+        if(BlockNumber < threshold)
+            threshold=BlockNumber;
+        
+        for(int i=0;i<threshold;i++){
+            String addr=Utils.IntToTrytes(i, prefixLength)+"AAAAAAA";
+            mayExists(addr);
+        }
+    }
+    public void savaData(){
+        for(int i=0;i<=Scaled;i++){
+            String path="HBF"+i;
+            File f=new File(path);
+            try {
+                if(!f.exists()) {System.out.println("DATA File Not Exists");}
+
+                RandomAccessFile rs=new RandomAccessFile(f, "w");
+                for(int j=0;j<BlockNumber;j++){
+                    GroupBloomFilter g=BlockMap.get(i*BlockNumber+j);
+                    for(int k=0;k<g.BFUnits;k++){
+                        if(g.isActive(k)){
+                            rs.seek((long)(j*g.Size()+k*BFUsize));
+                            rs.write(g.getBFU(k).getBloomAsByteArray());
+                        }
+                    }
+                }
+                rs.close();
+            } catch (Exception e) {
+                //TODO: handle exception
+            }//47ms
+        }
+    }
+
     public int prefixLength() {
         return prefixLength;
     }
@@ -192,7 +259,7 @@ public class HotBF {
             if ((BFUs = BlockMap.get(t).Actives()) > 0) {
                 activeGBF++;
                 activeBFU += BFUs;
-                if (activeBFU > numbers)
+                if (activeGBF >= numbers)
                     break;
             }
         }
@@ -209,11 +276,10 @@ public class HotBF {
 
                 GroupBloomFilter gb = BlockMap.get(t);
                 if (gb.isActive()) {
-                    gb.EliminateBFU(1);
-                    target--;
+                    target-=gb.EliminateBFU(1);;
                 }
             }
-        } else if (activeBFU > numbers) {
+        } else if (activeBFU >= numbers) {
             // eliminate all left BFUs
             while (target > 0) {
                 int t = 0;
@@ -224,8 +290,7 @@ public class HotBF {
                     if (left > target) {
                         left = target;
                     }
-                    gb.EliminateBFU(left);
-                    target -= left;
+                    target -= gb.EliminateBFU(left);
                 }
             }
         } else {
@@ -242,12 +307,14 @@ public class HotBF {
         }
         return result;
     }
-
+    //Timer t3=metrics.timer("Elininate");
     public void tryEliminated() {
         int T = TotalActives();
         int limitedBFU = limitedSize / BFUsize;
         if (T * BFUsize > limitedSize) {
+            //Timer.Context ctx=t3.time();
             Eliminated(T - limitedBFU);
+            //ctx.close();
         }
     }
 
@@ -282,7 +349,9 @@ public class HotBF {
             }
         }
     }
-
+    
+       
+        //Timer t2=metrics.timer("mayExists");
     /**
      * First, check the BFU of the memory one by one, and return false directly if
      * it returns negative. Otherwise, load the BFU from the disk one by one, and
@@ -295,7 +364,13 @@ public class HotBF {
         // check Block from newly generated to old
         for (int i = Scales[prefix]; i >= 0; i--) {
             int currentBlock = i * BlockNumber + prefix;
+            //update BlockLRU
+            BlockLRU.remove(currentBlock);
+            BlockLRU.add(currentBlock);
+
+            //Timer.Context ctx=t2.time();
             mayExistsResponce result = BlockMap.get(currentBlock).mayExists(address);
+            //ctx.close();
             if (result.loadIn = true) {
                 TryEliminate = true;// any block load in new BFU
             }
@@ -329,9 +404,10 @@ public class HotBF {
 
         // add new group of Blocks with same prefix
         // compared with old block,new block hava one more BFU
-        double newP = P / Math.pow(4,Scaled);   // ,Scaled P<=P0/(1-r)
+        //double newP = P / Math.pow(4,Scaled);   // ,Scaled P<=P0/(1-r)
         for (int i = 0; i < BlockNumber; i++) {
-            GroupBloomFilter newG = new GroupBloomFilter(BFUsize, hashFunctions, newP);
+            //GroupBloomFilter newG = new GroupBloomFilter(BFUsize, hashFunctions, newP);
+            GroupBloomFilter newG=new GroupBloomFilter(BFUsize,hashFunctions,5+Scaled,this,i);
             newG.setPath("HBF" + Scaled);
             newG.iniBFULRU();
             BlockMap.put(Scaled*BlockNumber+i, newG);
@@ -347,5 +423,42 @@ public class HotBF {
             BlockLRU=newBlockLRU;
         }
 
+    }
+
+    public void print(){
+        Iterator<Integer> it=BlockLRU.iterator();
+        System.out.printf("BlockLRU:");
+        while(it.hasNext()){
+            System.out.printf("%d ",it.next().intValue());
+        }
+        System.out.printf("\n");
+
+        for(int i=0;i<BlockMap.size();i++){
+            BlockMap.get(i).print();
+        }
+    }
+
+    class micromonitor extends Thread{
+        int index=0;
+        HotBF hot;
+        micromonitor(HotBF h){
+            hot=h;
+        }
+        public void run(){
+            while(true){
+                if(index%100 == 0){
+                    hot.Insert(SeedRandomGenerator.generateNewSeed());
+                    System.out.println(this.getId()+" index "+index);
+                }
+                else{
+                    hot.mayExists(SeedRandomGenerator.generateNewSeed());
+                }
+                index++;
+            }
+        }
+    }
+
+    public micromonitor newMicroMonitor(){
+        return new micromonitor(this);
     }
 }
