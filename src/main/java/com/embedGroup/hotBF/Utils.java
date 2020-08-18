@@ -1,5 +1,13 @@
 package com.embedGroup.hotBF;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.MetricAttribute;
+import com.codahale.metrics.MetricRegistry;
+
 import org.iota.jota.types.Trytes;
 
 public class Utils {
@@ -35,5 +43,27 @@ public class Utils {
             if(i!=length-1)   result*=27;
         }
         return result;
+    }
+
+    public static ConsoleReporter getreport(MetricRegistry registry){
+        Set<MetricAttribute> dis=new HashSet<>();
+        dis.add(MetricAttribute.MAX);
+        dis.add(MetricAttribute.MIN);
+        dis.add(MetricAttribute.STDDEV);
+        dis.add(MetricAttribute.P50);
+        dis.add(MetricAttribute.P75);
+        dis.add(MetricAttribute.P95);
+        dis.add(MetricAttribute.P98);
+        dis.add(MetricAttribute.P99);
+        dis.add(MetricAttribute.P999);
+        dis.add(MetricAttribute.M1_RATE);
+        dis.add(MetricAttribute.M5_RATE);
+        dis.add(MetricAttribute.M15_RATE);
+        dis.add(MetricAttribute.MEAN_RATE);
+        
+        ConsoleReporter reporter = ConsoleReporter.forRegistry(registry).convertRatesTo(TimeUnit.MICROSECONDS)
+            .convertDurationsTo(TimeUnit.MICROSECONDS).disabledMetricAttributes(dis).build();
+        return reporter;
+        
     }
 }

@@ -6,13 +6,20 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
+import com.beust.jcommander.internal.Sets;
 import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.MetricAttribute;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.MetricSet;
+import com.codahale.metrics.Reporter;
 import com.codahale.metrics.Timer;
 import com.embedGroup.hotBF.GroupBloomFilter.mayExistsResponce;
 import com.mongodb.Block;
@@ -31,10 +38,11 @@ public class HotBF {
     private int Scaled = 0;// Scaled=max(Scales)
     ConcurrentLinkedQueue<Integer> BlockLRU = new ConcurrentLinkedQueue<>();
     HashMap<Integer, GroupBloomFilter> BlockMap = new HashMap<>();
+    ArrayList<Buffer> buffers = new ArrayList<>();
 
     public MetricRegistry metrics = new MetricRegistry();
-    public ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
-            .convertDurationsTo(TimeUnit.MICROSECONDS).build();
+    public ConsoleReporter reporter = Utils.getreport(metrics);
+
 
     public int remainder;// left space in memory
     Timer eliminateT = metrics.timer("HotBF eliminate");
@@ -57,7 +65,6 @@ public class HotBF {
      */
     public void ini(int prefixlength, int bfusize, int hashfunctions, double p, int limitedsize) {
         Timer.Context c = iniT.time();
-
         prefixLength = prefixlength;
         BFUsize = bfusize;
         hashFunctions = hashfunctions;
@@ -83,7 +90,7 @@ public class HotBF {
                 if (!data.exists()) {
                     data.createNewFile();
                     RandomAccessFile rf = new RandomAccessFile(data, "rw");
-                    rf.setLength((long) gb.Size() * BlockNumber / 8);
+                    rf.setLength((long) BFUsize*BFunits * BlockNumber / 8);
                     rf.close();
                 } else {
                     System.out.println("ERROR:HBF but without HBF-Meta");
@@ -106,6 +113,8 @@ public class HotBF {
 
             }
 
+            // buffers
+            buffers.add(new Buffer(100 * 1024 * 1024 * 8, this, 0));
         } else {
             try {
                 // Not bootstrap,Load metadata
@@ -123,7 +132,7 @@ public class HotBF {
                 for (String s : q) {
                     BlockLRU.add(Integer.valueOf(s));
                 }
-                
+
                 // add Scaled Blocks
                 // entitis | active BFUs
                 // BFULRU
@@ -153,7 +162,7 @@ public class HotBF {
                                 // BlockMap.get(i * BlockNumber + k).LoadInBFU(j); massive cost way
                                 BloomFilter<String> bf = new FilterBuilder(BFUsize, hashfunctions).buildBloomFilter();
 
-                                ra.seek( ((long)j * g.Size()) + k * BFUsize);
+                                ra.seek((((long) j * g.Size()) + k * BFUsize)/8);
                                 ra.read(tmp);
                                 bf.setBloom(tmp);
                                 g.Group.put(k, bf);
@@ -163,8 +172,11 @@ public class HotBF {
                         BlockMap.put(i * BlockNumber + j, g);
                     }
                     ra.close();
+
+                    // buffers
+                    buffers.add(new Buffer(100 * 1024 * 1024 * 8, this, i));
                 }
-                //System.out.println("BlockMap size "+BlockMap.size());
+                // System.out.println("BlockMap size "+BlockMap.size());
                 br.close();
             } catch (Exception e) {
                 // TODO: handle exception
@@ -183,6 +195,13 @@ public class HotBF {
         /*
          * for (int i = 0; i < BlockMap.size(); i++) { BlockMap.get(i).ShutDown(); }
          */
+
+        // cause buffer's data is older than BlockMap,So sava Buffer data first
+        // sava buffers
+        for (int i = 0; i <= Scaled; i++) {
+            buffers.get(i).Flush();
+        }
+
         savaData();
 
         File meta = new File("HBF-Meta");
@@ -236,13 +255,13 @@ public class HotBF {
                 if (!f.exists()) {
                     System.out.println("DATA File Not Exists");
                 }
+                RandomAccessFile rs = new RandomAccessFile(f, "rw");
 
-                RandomAccessFile rs = new RandomAccessFile(f, "w");
                 for (int j = 0; j < BlockNumber; j++) {
                     GroupBloomFilter g = BlockMap.get(i * BlockNumber + j);
                     for (int k = 0; k < g.BFUnits; k++) {
                         if (g.isActive(k)) {
-                            rs.seek( ((long)j * g.Size() + k * BFUsize));
+                            rs.seek((((long) j * g.Size() + k * BFUsize))/8);
                             rs.write(g.getBFU(k).getBloomAsByteArray());
                         }
                     }
@@ -332,19 +351,13 @@ public class HotBF {
         c.close();
         return result;
     }
-
-    // Timer t3=metrics.timer("Elininate");
-    public void tryEliminated(int BFUs) {
-        Timer.Context c = tryEliminateT.time();
-        int T = TotalActives();
-        int limitedBFU = limitedSize / BFUsize;
-        if (T * BFUsize > limitedSize) {
-            // Timer.Context ctx=t3.time();
-            Eliminated(T - limitedBFU);
-            // ctx.close();
-        }
-        c.close();
-    }
+    /*
+     * // Timer t3=metrics.timer("Elininate"); public void tryEliminated(int BFUs) {
+     * Timer.Context c = tryEliminateT.time(); int T = TotalActives(); int
+     * limitedBFU = limitedSize / BFUsize; if (T * BFUsize > limitedSize) { //
+     * Timer.Context ctx=t3.time(); Eliminated(T - limitedBFU); // ctx.close(); }
+     * c.close(); }
+     */
 
     /**
      * Obtain the block number according to the prefix of the address, load all BFUs
@@ -482,10 +495,19 @@ public class HotBF {
         }
 
         public void run() {
+            String indertedAddr=null;
             while (true) {
                 if (index % 100 == 0) {
-                    hot.Insert(SeedRandomGenerator.generateNewSeed());
+                    indertedAddr = SeedRandomGenerator.generateNewSeed();
+                    hot.Insert(indertedAddr);
                     System.out.println(this.getId() + " index " + index);
+                } else if (index % 50 == 0) {
+                    if (indertedAddr != null) {
+                        if (!hot.mayExists(indertedAddr)) {
+                            System.out.println("False Negative");
+                            return;
+                        }
+                    }
                 } else {
                     hot.mayExists(SeedRandomGenerator.generateNewSeed());
                 }
@@ -498,4 +520,7 @@ public class HotBF {
         return new micromonitor(this);
     }
 
+    public int getBFUSize() {
+        return BFUsize;
+    }
 }

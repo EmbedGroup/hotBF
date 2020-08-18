@@ -33,12 +33,14 @@ public class App
         //MicroBenchmark.clear();
         
         //MicroBenchmark.randomCheckLatency();
-        //MicroBenchmark.dencyTest();
+        MicroBenchmark.dencyTest();
         //MicroBenchmark.insight();
-        MicroBenchmark.clear();
+        //MicroBenchmark.clear();
         //MicroBenchmark.warmup();
-        MicroBenchmark.mutithread();
+        //MicroBenchmark.mutithread();
         //MicroBenchmark.wps();
         //MicroBenchmark.ini_shutdown();
+        //Test.treeMapTest();
+        //MicroBenchmark.ScaleTest();
     }
 }

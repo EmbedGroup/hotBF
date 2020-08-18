@@ -7,7 +7,10 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.RandomAccessFile;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -233,5 +236,25 @@ public class Test {
         }, "Shutdown Hook"));
     }
 
+    public static void treeMapTest(){
+        TreeMap<Integer,String> map;
+        LinkedHashMap<Integer,String> map2=new LinkedHashMap<>();
+
+        map2.put(1, "a");
+        map2.put(3, "c");
+        map2.put(2, "b");
+        
+
+        Iterator<Map.Entry<Integer,String>> i=map2.entrySet().iterator();
+        while(i.hasNext()){
+            System.out.println("vale:"+i.next().getValue());
+        }
+
+        map=new TreeMap<>(map2);
+        i=map.entrySet().iterator();
+        while(i.hasNext()){
+            System.out.println("vale:"+i.next().getValue());
+        }
+    }
 
 }

@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Reporter;
 import com.codahale.metrics.Timer;
 import com.embedGroup.hotBF.HotBF.micromonitor;
 
@@ -79,10 +80,10 @@ public class MicroBenchmark {
         HotBF hot = new HotBF();
         hot.ini(3, 4 * 1024 * 8, 2, 0.001, 100 * 1024 * 8 * 1024);
         int amount = 1000;
-        String[] addresses = new String[amount];
+        String[] addresses1 = new String[amount];
         for (int i = 0; i < amount; i++) {
             String addr = SeedRandomGenerator.generateNewSeed();
-            addresses[i] = addr;
+            addresses1[i] = addr;
             hot.Insert(addr);
             if (i % 100 == 0) {
                 System.out.println(i);
@@ -90,7 +91,7 @@ public class MicroBenchmark {
         }
 
         for (int i = 0; i < amount; i++) {
-            if (!hot.mayExists(addresses[i])) {
+            if (!hot.mayExists(addresses1[i])) {
                 System.out.println("ERROR");
             }
             if (i % 100 == 0) {
@@ -102,10 +103,10 @@ public class MicroBenchmark {
 
         hot = new HotBF();
         hot.ini(3, 4 * 1024 * 8, 2, 0.001, 100 * 1024 * 8 * 1024);
-        addresses = new String[amount];
+        String[] addresses2 = new String[amount];
         for (int i = 0; i < amount; i++) {
             String addr = SeedRandomGenerator.generateNewSeed();
-            addresses[i] = addr;
+            addresses2[i] = addr;
             hot.Insert(addr);
             if (i % 100 == 0) {
                 System.out.println(i);
@@ -113,7 +114,7 @@ public class MicroBenchmark {
         }
 
         for (int i = 0; i < amount; i++) {
-            if (!hot.mayExists(addresses[i])) {
+            if (!hot.mayExists(addresses1[i])) {
                 System.out.println("ERROR");
             }
             if (i % 100 == 0) {
@@ -123,6 +124,9 @@ public class MicroBenchmark {
 
         hot.ShutDown();
 
+        hot.reporter.report();
+        GroupBloomFilter.reporter.report();
+        Buffer.reporter.report();
     }
 
     public static void ScaleTest() {
@@ -244,17 +248,17 @@ public class MicroBenchmark {
         clear();
         HotBF hot = new HotBF();
         hot.ini(3, 4 * 1024 * 8, 2, 0.001, 100 * 1024 * 1024 * 8);
-        for (int i = 0; i < 27 * 27*27; i++) {
-            hot.Insert(Utils.IntToTrytes(i, 3)+"AAAAAAAAAAAAAA");//activite all GBF's  
+        for (int i = 0; i < 27 * 27 * 27; i++) {
+            hot.Insert(Utils.IntToTrytes(i, 3) + "AAAAAAAAAAAAAA");// activite all GBF's
         }
         hot.ShutDown();
 
-        hot=new HotBF();
+        hot = new HotBF();
         hot.ini(3, 4 * 1024 * 8, 2, 0.001, 100 * 1024 * 1024 * 8);
-        for (int i = 0; i < 27 * 27*27; i++) {
-            if(!hot.mayExists(Utils.IntToTrytes(i, 3)+"AAAAAAAAAAAAAA")){
+        for (int i = 0; i < 27 * 27 * 27; i++) {
+            if (!hot.mayExists(Utils.IntToTrytes(i, 3) + "AAAAAAAAAAAAAA")) {
                 System.out.println("error");
-                //activite all GBF's  
+                // activite all GBF's
             }
         }
         hot.ShutDown();
@@ -264,76 +268,73 @@ public class MicroBenchmark {
         clear();
         HotBF hot = new HotBF();
         // raw bootstrap
-        hot.ini(1, 4 * 1024 * 8, 2, 0.001, 4 * 1024 * 8 * 5*3);
+        hot.ini(1, 4 * 1024 * 8, 2, 0.001, 4 * 1024 * 8 * 5 * 3);
         ICurl customCurl = SpongeFactory.create(SpongeFactory.Mode.KERL);
         String seed = "QV9BDEJQVJHRBVKZQKYIJBCQVMUZQTSKAGHF9CUXEZPVQKGMPYJSMLVGVXVQGMUINQIY9MOUABVYUGBMD";
         int amount = 1;
         // insert till full
         for (int i = 0; i < 3; i++) {
             String address = IotaAPIUtils.newAddress(seed, 1, i, false, customCurl);
-            System.out.println(Utils.TrytesToInt(address, 1)+":"+address);
+            System.out.println(Utils.TrytesToInt(address, 1) + ":" + address);
             hot.Insert(address);
         }
 
         hot.print();
 
-        //insert new one,elimanate old 5
+        // insert new one,elimanate old 5
         String address = IotaAPIUtils.newAddress(seed, 1, 4, false, customCurl);
-        System.out.println(Utils.TrytesToInt(address, 1)+":"+address);
+        System.out.println(Utils.TrytesToInt(address, 1) + ":" + address);
         hot.Insert(address);
         hot.print();
 
-        //check inserted and elimated,bring 5 in
+        // check inserted and elimated,bring 5 in
         address = IotaAPIUtils.newAddress(seed, 1, 0, false, customCurl);
-        System.out.println(Utils.TrytesToInt(address, 1)+":"+address);
+        System.out.println(Utils.TrytesToInt(address, 1) + ":" + address);
         hot.mayExists(address);
         hot.print();
 
-        //check one not inserted,bring 1 in
+        // check one not inserted,bring 1 in
         address = IotaAPIUtils.newAddress(seed, 1, 5, false, customCurl);
-        System.out.println(Utils.TrytesToInt(address, 1)+":"+address);
+        System.out.println(Utils.TrytesToInt(address, 1) + ":" + address);
         hot.mayExists(address);
         hot.print();
 
-        //shutdown and rebuild
+        // shutdown and rebuild
         System.out.println("ShutDown Rebuild");
         hot.ShutDown();
 
-        hot=new HotBF();
-        hot.ini(1, 4 * 1024 * 8, 2, 0.001, 4 * 1024 * 8 * 5*3);
-        
+        hot = new HotBF();
+        hot.ini(1, 4 * 1024 * 8, 2, 0.001, 4 * 1024 * 8 * 5 * 3);
+
         hot.print();
         hot.ShutDown();
 
-
     }
 
-    
-    public static void mutithread(){
-        //clear();
-        HotBF hot=new HotBF();
-        hot.ini(3, 4*1024*8, 2, 0.001, 100*1024*1024*8);
-        int num=4;
-        for(int i=0;i<num;i++){
-            micromonitor m=hot.newMicroMonitor();
+    public static void mutithread() {
+        // clear();
+        HotBF hot = new HotBF();
+        hot.ini(3, 4 * 1024 * 8, 2, 0.001, 100 * 1024 * 1024 * 8);
+        int num = 4;
+        for (int i = 0; i < num; i++) {
+            micromonitor m = hot.newMicroMonitor();
             m.start();
         }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            
             hot.ShutDown();
             hot.reporter.report();
             GroupBloomFilter.reporter.report();
-
+            Buffer.reporter.report();
         }, "Shutdown Hook"));
-        
+
     }
 
-    public static void warmup(){
-        HotBF hot=new HotBF();
-        hot.ini(3, 4*1024*8, 2, 0.001, 100*1024*1024*8);
-        long start=System.currentTimeMillis();
+    public static void warmup() {
+        HotBF hot = new HotBF();
+        hot.ini(3, 4 * 1024 * 8, 2, 0.001, 100 * 1024 * 1024 * 8);
+        long start = System.currentTimeMillis();
         hot.WarmUp();
-        System.out.println("Warm UP time "+(System.currentTimeMillis()-start));
+        System.out.println("Warm UP time " + (System.currentTimeMillis() - start));
         hot.ShutDown();
     }
 

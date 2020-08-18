@@ -39,8 +39,7 @@ public class GroupBloomFilter {
     private int Actives;// BFU numbers in memory
 
     public static MetricRegistry metrics = new MetricRegistry();
-    public static ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
-            .convertDurationsTo(TimeUnit.MICROSECONDS).build();
+    public static ConsoleReporter reporter = Utils.getreport(metrics);
 
     public static Timer addT = metrics.timer("Group add");
     public static Timer checkBFUWithHashdT = metrics.timer("Group checkBFUWithHashValues");
@@ -268,13 +267,19 @@ public class GroupBloomFilter {
      */
     public int Insert(String address) {
         Timer.Context c = insertT.time();
-        int loadin=0;
+        int loadin = 0;
         // load all BFU into memory
+        Buffer buffer=hot.buffers.get(BFUnits-5);
         for (int i = 0; i < BFUnits; i++) {
             if (!Active[i]) {
                 // load BFU into memory
-                BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
-                bf.load(path, getOffset(index, i), BFUsize);
+                BloomFilter<String> bf;
+                if(buffer.contains(index*BFUnits+i)){
+                    bf=buffer.get(index*BFUnits+i);
+                }else{
+                    bf=new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+                    bf.load(path, getOffset(index, i), BFUsize);
+                }
                 Group.put(i, bf);
                 Active[i] = true;
                 loadin++;
@@ -310,8 +315,7 @@ public class GroupBloomFilter {
     /**
      * First check BFUs in memory,then if needed,load in BFU to check .When a
      * negative result is obtained, move the corresponding BFU to the MRU end,
-     * otherwise no change is made
-     * Load in checked unactive BFU
+     * otherwise no change is made Load in checked unactive BFU
      */
     public mayExistsResponce mayExists(String address) {
         Timer.Context c = mayexistsT.time();
@@ -336,23 +340,28 @@ public class GroupBloomFilter {
                     }
                 }
             }
-            // else,need to bring other BFUs into memory
             if (Actives == BFUnits)
                 return (new mayExistsResponce(true, 0));
 
+            Buffer buffer = hot.buffers.get(BFUnits - 5);
             // load in needed BFUs
             // if result is true,persist all those in memory
             // if result is false,persist only the negative BFU
             HashMap<Integer, BloomFilter<String>> loadedin = new HashMap<>();
             for (int i = 0; i < BFUnits; i++) {
                 if (!Active[i]) {
-                    loadtimes++;
+                    int BufIndex = index * BFUnits + i;
+                    BloomFilter<String> bf;
+                    // First check buffer
+                    if (buffer.contains(BufIndex)) {
+                        bf = buffer.get(BufIndex);
+                    } else {
+                        bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+                        bf.load(path, getOffset(index, i), BFUsize);
+                        loadtimes++;
+                    }
                     // read into memory
-                    BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
-                    bf.load(path, getOffset(index, i), BFUsize);
                     loadedin.put(i, bf);
-                    Active[i] = true;
-                    Actives++;
 
                     // check
                     boolean result = true;
@@ -368,6 +377,8 @@ public class GroupBloomFilter {
                         BFULRU.remove(i);
                         BFULRU.add(i);
                         Group.put(i, bf);
+                        Active[i] = true;
+                        Actives++;
                         return (new mayExistsResponce(false, 1));
                     }
 
@@ -377,6 +388,8 @@ public class GroupBloomFilter {
                 BloomFilter<String> bf = loadedin.get(i);
                 if (bf != null) {
                     Group.put(i, bf);
+                    Active[i] = true;
+                    Actives++;
                 }
             }
             return (new mayExistsResponce(true, loadedin.size()));
@@ -417,6 +430,8 @@ public class GroupBloomFilter {
         }
         Iterator<Integer> it = BFULRU.iterator();
         int target = numbers;
+        //save to buffer
+        Buffer buffer=hot.buffers.get(BFUnits-5);
         while (target > 0 && it.hasNext()) {
 
             int t;
@@ -424,7 +439,8 @@ public class GroupBloomFilter {
             BloomFilter<String> bf = Group.get(t);
             if (Active[t] && bf != null) {
                 // Group.get(t).save(path, getOffset(index, t), BFUsize);// save before remove
-                bf.save(path, (long) index * Size + t * BFUsize, BFUsize);
+                //bf.save(path, (long) index * Size + t * BFUsize, BFUsize);
+                buffer.put(index*BFUnits+t, bf);    //push to buffer
                 Group.remove(t);// remove BFU
                 savetimes++;
                 Active[t] = false;
