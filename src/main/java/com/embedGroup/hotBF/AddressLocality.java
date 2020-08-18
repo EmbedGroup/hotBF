@@ -49,7 +49,7 @@ public class AddressLocality {
             try {
                 if (!f.exists())
                     f.createNewFile();
-                BufferedWriter bw = new BufferedWriter(new FileWriter(f, true));
+                BufferedWriter bw = new BufferedWriter(new FileWriter(f, false));
                 Date date = new Date();
                 String strDateFormat = "yyyy-MM-dd HH:mm:ss";
                 SimpleDateFormat sdf = new SimpleDateFormat(strDateFormat);

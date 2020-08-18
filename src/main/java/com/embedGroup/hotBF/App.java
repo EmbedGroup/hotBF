@@ -1,5 +1,7 @@
 package com.embedGroup.hotBF;
 
+import com.embedGroup.hotBF.HotBF.micromonitor;
+
 import org.iota.jota.utils.IotaAPIUtils;
 
 /**
@@ -29,13 +31,14 @@ public class App
         //GroupBloomFilter g=new GroupBloomFilter(4*1024*8, 2, 0.001);
         //Test.zmq();
         //MicroBenchmark.clear();
-        //MicroBenchmark.clear();
+        
         //MicroBenchmark.randomCheckLatency();
         //MicroBenchmark.dencyTest();
         //MicroBenchmark.insight();
-        //MicroBenchmark.mutithread();
         MicroBenchmark.clear();
-        MicroBenchmark.warmup();
+        //MicroBenchmark.warmup();
+        MicroBenchmark.mutithread();
+        //MicroBenchmark.wps();
+        //MicroBenchmark.ini_shutdown();
     }
 }
-

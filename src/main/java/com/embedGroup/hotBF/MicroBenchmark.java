@@ -321,6 +321,9 @@ public class MicroBenchmark {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             
             hot.ShutDown();
+            hot.reporter.report();
+            GroupBloomFilter.reporter.report();
+
         }, "Shutdown Hook"));
         
     }

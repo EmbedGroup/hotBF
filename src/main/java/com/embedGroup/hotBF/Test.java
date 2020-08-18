@@ -223,8 +223,9 @@ public class Test {
     }
 
     public static void zmq(){
-        ZMQPrint p=new ZMQPrint("212.47.242.90", 5556);
+        ZMQPrint p=new ZMQPrint("127.0.0.1", 5556);
         //http://173.212.200.186:14265
+        //161.117.83.53
         p.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             p.lo.write();

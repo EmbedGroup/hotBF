@@ -32,23 +32,38 @@ public class HotBF {
     ConcurrentLinkedQueue<Integer> BlockLRU = new ConcurrentLinkedQueue<>();
     HashMap<Integer, GroupBloomFilter> BlockMap = new HashMap<>();
 
-    //MetricRegistry metrics = new MetricRegistry();
-    //ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
-            //.convertDurationsTo(TimeUnit.MICROSECONDS).build();
+    public MetricRegistry metrics = new MetricRegistry();
+    public ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
+            .convertDurationsTo(TimeUnit.MICROSECONDS).build();
+
+    public int remainder;// left space in memory
+    Timer eliminateT = metrics.timer("HotBF eliminate");
+    Timer iniT = metrics.timer("HotBF ini");
+    Timer insertT = metrics.timer("HotBF insert");
+    Timer mayexistsT = metrics.timer("HotBF mayExists");
+    Timer savadataT = metrics.timer("HotBF savadata");
+    Timer scaleT = metrics.timer("HotBF scale");
+    Timer shutT = metrics.timer("HotBF shutdown");
+    Timer tryEliminateT = metrics.timer("HotBF tryEliminate");
+    Timer totalActiveT = metrics.timer("HotBF totalActive");
+
     /**
      * 
      * @param prefixlength
      * @param bfusize
      * @param hashfunctions
      * @param p
-     * @param limitedsize Bloom filters size in memory threhold(bits)
+     * @param limitedsize   Bloom filters size in memory threhold(bits)
      */
     public void ini(int prefixlength, int bfusize, int hashfunctions, double p, int limitedsize) {
+        Timer.Context c = iniT.time();
+
         prefixLength = prefixlength;
         BFUsize = bfusize;
         hashFunctions = hashfunctions;
         P = p;
         limitedSize = limitedsize;
+        remainder = limitedsize / BFUsize;
 
         BlockNumber = (int) Math.pow(27, prefixLength);
         GroupBloomFilter gb = new GroupBloomFilter(BFUsize, hashFunctions, P);
@@ -56,7 +71,6 @@ public class HotBF {
         Scales = new int[BlockNumber];
         // build block map
         // At First,no Active BFU
-        
 
         // load metadata
 
@@ -79,7 +93,7 @@ public class HotBF {
                 // TODO: handle exception
                 e.printStackTrace();
             }
-            //initialize GroupBloomFIlters
+            // initialize GroupBloomFIlters
             for (int i = 0; i < BlockNumber; i++) {
                 GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, P, this, i);
                 g.setPath("HBF" + 0);
@@ -89,7 +103,7 @@ public class HotBF {
             // initialize BlockLRU,BFULRU
             for (int i = 0; i < BlockNumber; i++) {
                 BlockLRU.add(i);
-                
+
             }
 
         } else {
@@ -103,73 +117,72 @@ public class HotBF {
                     if (Scales[i] > Scaled)
                         Scaled = Scales[i];
                 }
-                // add Scaled Blocks
-                for (int i = 0; i <= Scaled; i++) {
-                    for (int j = 0; j < BlockNumber; j++) {
-                        //Scaled Block should with a 0.25*P
-                        GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, 5+i, this, j);
-                        g.setPath("HBF" + i);
-                        BlockMap.put(i * BlockNumber + j, g);
-                    }
-                }
-
                 // BLockLRU
                 String queue = br.readLine();
                 String[] q = queue.split(" ");
-                if (!(q.length == BlockMap.size())) {
-                    System.out.println("metadata error");
-                }
                 for (String s : q) {
                     BlockLRU.add(Integer.valueOf(s));
                 }
+                
+                // add Scaled Blocks
                 // entitis | active BFUs
                 // BFULRU
-                for (int i = 0; i < BlockMap.size(); i++) {
-                    String meta1 = br.readLine();
-                    String meta2 = br.readLine();
-                    BlockMap.get(i).loadmeta(meta1, meta2);
-                }
-                br.close();
                 // load in active BFU
                 for (int i = 0; i <= Scaled; i++) {
-                    // Scaled blocks are persisted in new file
                     File data = new File("HBF" + i);
                     if (!data.exists()) {
                         System.out.println("ERROR:NO DATA");
                         return;
                     }
-                    RandomAccessFile ra=new RandomAccessFile(data, "r");
-                    byte[] tmp=new byte[BFUsize];
-                    for (int k = 0; k < BlockNumber; k++) {
-                        GroupBloomFilter g=BlockMap.get(i*BlockNumber+k);
-                        for (int j = 0; j < g.BFUnits; j++) {
-                            if (BlockMap.get(i * BlockNumber + k).isActive(j)) {
-                                //BlockMap.get(i * BlockNumber + k).LoadInBFU(j); massive cost way
-                                BloomFilter<String> bf=new FilterBuilder(BFUsize,hashfunctions).buildBloomFilter();
+                    RandomAccessFile ra = new RandomAccessFile(data, "r");
+                    byte[] tmp = new byte[BFUsize];
 
-                                ra.seek((long)(k*g.Size())+j*BFUsize);
+                    for (int j = 0; j < BlockNumber; j++) {
+                        // metadata
+                        GroupBloomFilter g = new GroupBloomFilter(BFUsize, hashFunctions, 5 + i, this, j);
+                        g.setPath("HBF" + i);
+                        String meta1 = br.readLine();
+                        String meta2 = br.readLine();
+                        g.loadmeta(meta1, meta2);
+
+                        remainder -= g.Actives();
+
+                        // load in active BFU
+                        for (int k = 0; k < g.BFUnits; k++) {
+                            if (g.isActive(k)) {
+                                // BlockMap.get(i * BlockNumber + k).LoadInBFU(j); massive cost way
+                                BloomFilter<String> bf = new FilterBuilder(BFUsize, hashfunctions).buildBloomFilter();
+
+                                ra.seek( ((long)j * g.Size()) + k * BFUsize);
                                 ra.read(tmp);
                                 bf.setBloom(tmp);
-                                g.Group.put(j, bf);
+                                g.Group.put(k, bf);
                             }
                         }
+                        // add block
+                        BlockMap.put(i * BlockNumber + j, g);
                     }
                     ra.close();
                 }
+                //System.out.println("BlockMap size "+BlockMap.size());
+                br.close();
             } catch (Exception e) {
                 // TODO: handle exception
+                e.printStackTrace();
             }
 
         }
-        //reporter.start(5, TimeUnit.SECONDS);
+        // reporter.start(5, TimeUnit.SECONDS);
+        c.close();
     }
 
     // save all Active BFU
     // save metaData
     public void ShutDown() {
-        /*for (int i = 0; i < BlockMap.size(); i++) {
-            BlockMap.get(i).ShutDown();
-        }*/
+        Timer.Context c = shutT.time();
+        /*
+         * for (int i = 0; i < BlockMap.size(); i++) { BlockMap.get(i).ShutDown(); }
+         */
         savaData();
 
         File meta = new File("HBF-Meta");
@@ -198,42 +211,48 @@ public class HotBF {
         } catch (Exception e) {
             // TODO: handle exception
         }
+        c.close();
     }
 
-    public void WarmUp(){
-        //bring all of GBF's first BFU into memory
-        //RAW bootstrap
-        int threshold=limitedSize/BFUsize;
-        if(BlockNumber < threshold)
-            threshold=BlockNumber;
-        
-        for(int i=0;i<threshold;i++){
-            String addr=Utils.IntToTrytes(i, prefixLength)+"AAAAAAA";
+    public void WarmUp() {
+        // bring all of GBF's first BFU into memory
+        // RAW bootstrap
+        int threshold = limitedSize / BFUsize;
+        if (BlockNumber < threshold)
+            threshold = BlockNumber;
+
+        for (int i = 0; i < threshold; i++) {
+            String addr = Utils.IntToTrytes(i, prefixLength) + "AAAAAAA";
             mayExists(addr);
         }
     }
-    public void savaData(){
-        for(int i=0;i<=Scaled;i++){
-            String path="HBF"+i;
-            File f=new File(path);
-            try {
-                if(!f.exists()) {System.out.println("DATA File Not Exists");}
 
-                RandomAccessFile rs=new RandomAccessFile(f, "w");
-                for(int j=0;j<BlockNumber;j++){
-                    GroupBloomFilter g=BlockMap.get(i*BlockNumber+j);
-                    for(int k=0;k<g.BFUnits;k++){
-                        if(g.isActive(k)){
-                            rs.seek((long)(j*g.Size()+k*BFUsize));
+    public void savaData() {
+        Timer.Context c = savadataT.time();
+        for (int i = 0; i <= Scaled; i++) {
+            String path = "HBF" + i;
+            File f = new File(path);
+            try {
+                if (!f.exists()) {
+                    System.out.println("DATA File Not Exists");
+                }
+
+                RandomAccessFile rs = new RandomAccessFile(f, "w");
+                for (int j = 0; j < BlockNumber; j++) {
+                    GroupBloomFilter g = BlockMap.get(i * BlockNumber + j);
+                    for (int k = 0; k < g.BFUnits; k++) {
+                        if (g.isActive(k)) {
+                            rs.seek( ((long)j * g.Size() + k * BFUsize));
                             rs.write(g.getBFU(k).getBloomAsByteArray());
                         }
                     }
                 }
                 rs.close();
             } catch (Exception e) {
-                //TODO: handle exception
-            }//47ms
+                // TODO: handle exception
+            } // 47ms
         }
+        c.close();
     }
 
     public int prefixLength() {
@@ -245,6 +264,7 @@ public class HotBF {
     }
 
     public void Eliminated(int numbers) {
+        Timer.Context c = eliminateT.time();
         // choose from numbers oldest Block(with BFUs>0 in memory),everyone choose
         // oldest BFU to remove
         Iterator<Integer> it = BlockLRU.iterator();
@@ -276,7 +296,8 @@ public class HotBF {
 
                 GroupBloomFilter gb = BlockMap.get(t);
                 if (gb.isActive()) {
-                    target-=gb.EliminateBFU(1);;
+                    target -= gb.EliminateBFU(1);
+                    remainder++;
                 }
             }
         } else if (activeBFU >= numbers) {
@@ -290,32 +311,39 @@ public class HotBF {
                     if (left > target) {
                         left = target;
                     }
-                    target -= gb.EliminateBFU(left);
+                    int removed = gb.EliminateBFU(left);
+                    target -= removed;
+                    remainder += removed;
                 }
             }
         } else {
             System.out.println("NO ENOUGH BFU TO ELIMINATE");
         }
-
+        c.close();
     }
 
     // Total Active BFUs in memory
     public int TotalActives() {
+        Timer.Context c = totalActiveT.time();
         int result = 0;
         for (int i = 0; i < BlockMap.size(); i++) {
             result += BlockMap.get(i).Actives();
         }
+        c.close();
         return result;
     }
-    //Timer t3=metrics.timer("Elininate");
-    public void tryEliminated() {
+
+    // Timer t3=metrics.timer("Elininate");
+    public void tryEliminated(int BFUs) {
+        Timer.Context c = tryEliminateT.time();
         int T = TotalActives();
         int limitedBFU = limitedSize / BFUsize;
         if (T * BFUsize > limitedSize) {
-            //Timer.Context ctx=t3.time();
+            // Timer.Context ctx=t3.time();
             Eliminated(T - limitedBFU);
-            //ctx.close();
+            // ctx.close();
         }
+        c.close();
     }
 
     /**
@@ -325,19 +353,21 @@ public class HotBF {
      * the principle of LRU
      */
     public void Insert(String address) {
+        Timer.Context c = insertT.time();
         int prefix = Utils.TrytesToInt(address, prefixLength);
         int currentBlock = Scales[prefix] * BlockNumber + prefix;
         // System.out.println(currentBlock);
         GroupBloomFilter G = BlockMap.get(currentBlock);
-        G.Insert(address);// load all BFUs of block into memory
+        remainder -= G.Insert(address);// load all BFUs of block into memory
 
         // move block to queue tail
         BlockLRU.remove(currentBlock);
         BlockLRU.add(currentBlock);
 
         // if hit the threshold,try remove BFUs following LRU
-        tryEliminated();
-
+        if (remainder < 0) {
+            Eliminated(0 - remainder);
+        }
         // check capacity
         synchronized (this) {
             if (G.isFull()) {
@@ -348,40 +378,44 @@ public class HotBF {
 
             }
         }
+        c.close();
     }
-    
-       
-        //Timer t2=metrics.timer("mayExists");
+
+    // Timer t2=metrics.timer("mayExists");
     /**
      * First, check the BFU of the memory one by one, and return false directly if
      * it returns negative. Otherwise, load the BFU from the disk one by one, and
      * check, until the end, if all return positive, return true
      */
     public boolean mayExists(String address) {
+        Timer.Context c = mayexistsT.time();
         int prefix = Utils.TrytesToInt(address, prefixLength);
         boolean Result = false;
-        boolean TryEliminate = false;
+        int TryEliminate = 0;
         // check Block from newly generated to old
         for (int i = Scales[prefix]; i >= 0; i--) {
             int currentBlock = i * BlockNumber + prefix;
-            //update BlockLRU
+            // update BlockLRU
             BlockLRU.remove(currentBlock);
             BlockLRU.add(currentBlock);
 
-            //Timer.Context ctx=t2.time();
+            // Timer.Context ctx=t2.time();
             mayExistsResponce result = BlockMap.get(currentBlock).mayExists(address);
-            //ctx.close();
-            if (result.loadIn = true) {
-                TryEliminate = true;// any block load in new BFU
-            }
+            // ctx.close();
+            // any block load in new BFU
+
+            TryEliminate += result.loadin;
             if (result.exists == true) {
                 Result = true;
                 break;
             }
         }
 
-        if (TryEliminate)
-            tryEliminated();
+        remainder -= TryEliminate;
+        if (remainder < 0) {
+            Eliminated(0 - remainder);
+        }
+        c.close();
         return Result;
     }
 
@@ -389,6 +423,7 @@ public class HotBF {
     // be soon all Group get full
     // create and setlength of new "HBF"file
     public void Scale() {
+        Timer.Context c = scaleT.time();
         Scaled++;
         File f = new File("HBF" + (Scaled));
         if (!f.exists()) {
@@ -404,53 +439,54 @@ public class HotBF {
 
         // add new group of Blocks with same prefix
         // compared with old block,new block hava one more BFU
-        //double newP = P / Math.pow(4,Scaled);   // ,Scaled P<=P0/(1-r)
+        // double newP = P / Math.pow(4,Scaled); // ,Scaled P<=P0/(1-r)
         for (int i = 0; i < BlockNumber; i++) {
-            //GroupBloomFilter newG = new GroupBloomFilter(BFUsize, hashFunctions, newP);
-            GroupBloomFilter newG=new GroupBloomFilter(BFUsize,hashFunctions,5+Scaled,this,i);
+            // GroupBloomFilter newG = new GroupBloomFilter(BFUsize, hashFunctions, newP);
+            GroupBloomFilter newG = new GroupBloomFilter(BFUsize, hashFunctions, 5 + Scaled, this, i);
             newG.setPath("HBF" + Scaled);
             newG.iniBFULRU();
-            BlockMap.put(Scaled*BlockNumber+i, newG);
-            //reschedule BlockLRU
-            ConcurrentLinkedQueue<Integer> newBlockLRU=new ConcurrentLinkedQueue<>();
-            for(int j=0;j<BlockNumber;j++)
-                newBlockLRU.add(Scaled*BlockNumber+j);
-            
-            Iterator<Integer> it=BlockLRU.iterator();
-            while(it.hasNext())
-                newBlockLRU.add(it.next());
-            
-            BlockLRU=newBlockLRU;
-        }
+            BlockMap.put(Scaled * BlockNumber + i, newG);
+            // reschedule BlockLRU
+            ConcurrentLinkedQueue<Integer> newBlockLRU = new ConcurrentLinkedQueue<>();
+            for (int j = 0; j < BlockNumber; j++)
+                newBlockLRU.add(Scaled * BlockNumber + j);
 
+            Iterator<Integer> it = BlockLRU.iterator();
+            while (it.hasNext())
+                newBlockLRU.add(it.next());
+
+            BlockLRU = newBlockLRU;
+        }
+        c.close();
     }
 
-    public void print(){
-        Iterator<Integer> it=BlockLRU.iterator();
+    public void print() {
+        Iterator<Integer> it = BlockLRU.iterator();
         System.out.printf("BlockLRU:");
-        while(it.hasNext()){
-            System.out.printf("%d ",it.next().intValue());
+        while (it.hasNext()) {
+            System.out.printf("%d ", it.next().intValue());
         }
         System.out.printf("\n");
 
-        for(int i=0;i<BlockMap.size();i++){
+        for (int i = 0; i < BlockMap.size(); i++) {
             BlockMap.get(i).print();
         }
     }
 
-    class micromonitor extends Thread{
-        int index=0;
+    class micromonitor extends Thread {
+        int index = 0;
         HotBF hot;
-        micromonitor(HotBF h){
-            hot=h;
+
+        micromonitor(HotBF h) {
+            hot = h;
         }
-        public void run(){
-            while(true){
-                if(index%100 == 0){
+
+        public void run() {
+            while (true) {
+                if (index % 100 == 0) {
                     hot.Insert(SeedRandomGenerator.generateNewSeed());
-                    System.out.println(this.getId()+" index "+index);
-                }
-                else{
+                    System.out.println(this.getId() + " index " + index);
+                } else {
                     hot.mayExists(SeedRandomGenerator.generateNewSeed());
                 }
                 index++;
@@ -458,7 +494,8 @@ public class HotBF {
         }
     }
 
-    public micromonitor newMicroMonitor(){
+    public micromonitor newMicroMonitor() {
         return new micromonitor(this);
     }
+
 }

@@ -22,9 +22,15 @@ class ZMQPrint extends Thread{
         while (true) {
             byte[] reply = socket.recv(0);
             String[] data = (new String(reply).split(" "));
-            while((index++)%100==0){
+            
+            if((index++)%100 == 0){
                 System.out.println(index+" TX recived");
             }
+            if(index%10000==0){
+                lo.summary();
+            }
+
+            
             if (data[0].equals("tx")) {
                 
                  //System.out.println("NEW TRANSACTION" + "\n" + "Transaction hash: " + data[1]
