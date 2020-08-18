@@ -36,4 +36,25 @@ public class Utils {
         }
         return result;
     }
+    public static ConsoleReporter getreport(MetricRegistry registry){
+        Set<MetricAttribute> dis=new HashSet<>();
+        dis.add(MetricAttribute.MAX);
+        dis.add(MetricAttribute.MIN);
+        dis.add(MetricAttribute.STDDEV);
+        dis.add(MetricAttribute.P50);
+        dis.add(MetricAttribute.P75);
+        dis.add(MetricAttribute.P95);
+        dis.add(MetricAttribute.P98);
+        dis.add(MetricAttribute.P99);
+        dis.add(MetricAttribute.P999);
+        dis.add(MetricAttribute.M1_RATE);
+        dis.add(MetricAttribute.M5_RATE);
+        dis.add(MetricAttribute.M15_RATE);
+        dis.add(MetricAttribute.MEAN_RATE);
+        
+        ConsoleReporter reporter = ConsoleReporter.forRegistry(registry).convertRatesTo(TimeUnit.MICROSECONDS)
+            .convertDurationsTo(TimeUnit.MICROSECONDS).disabledMetricAttributes(dis).build();
+        return reporter;
+        
+    }
 }
