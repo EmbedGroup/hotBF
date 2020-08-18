@@ -489,14 +489,14 @@ public class HotBF {
     class micromonitor extends Thread {
         int index = 0;
         HotBF hot;
-
+        public volatile boolean exit=false;
         micromonitor(HotBF h) {
             hot = h;
         }
 
         public void run() {
             String indertedAddr=null;
-            while (true) {
+            while (!exit) {
                 if (index % 100 == 0) {
                     indertedAddr = SeedRandomGenerator.generateNewSeed();
                     hot.Insert(indertedAddr);
