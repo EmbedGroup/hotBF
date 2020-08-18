@@ -39,8 +39,8 @@ public class GroupBloomFilter {
     private int Actives;// BFU numbers in memory
 
     public static MetricRegistry metrics = new MetricRegistry();
-    public static ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
-            .convertDurationsTo(TimeUnit.MICROSECONDS).build();
+    public static ConsoleReporter reporter = Utils.getreport(metrics);
+    
 
     public static Timer addT = metrics.timer("Group add");
     public static Timer checkBFUWithHashdT = metrics.timer("Group checkBFUWithHashValues");

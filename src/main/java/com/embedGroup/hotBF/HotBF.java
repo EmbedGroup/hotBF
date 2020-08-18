@@ -33,8 +33,7 @@ public class HotBF {
     HashMap<Integer, GroupBloomFilter> BlockMap = new HashMap<>();
 
     public MetricRegistry metrics = new MetricRegistry();
-    public ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).convertRatesTo(TimeUnit.MICROSECONDS)
-            .convertDurationsTo(TimeUnit.MICROSECONDS).build();
+    public ConsoleReporter reporter = Utils.getreport(metrics);
 
     public int remainder;// left space in memory
     Timer eliminateT = metrics.timer("HotBF eliminate");
@@ -476,7 +475,7 @@ public class HotBF {
     class micromonitor extends Thread {
         int index = 0;
         HotBF hot;
-
+    
         micromonitor(HotBF h) {
             hot = h;
         }
