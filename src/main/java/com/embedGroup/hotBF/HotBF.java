@@ -11,9 +11,9 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
+import com.embedGroup.metrics.ConsoleReporter;
+import com.embedGroup.metrics.MetricRegistry;
+import com.embedGroup.metrics.Timer;
 import com.embedGroup.hotBF.GroupBloomFilter.mayExistsResponce;
 import com.mongodb.Block;
 
@@ -236,7 +236,7 @@ public class HotBF {
                     System.out.println("DATA File Not Exists");
                 }
 
-                RandomAccessFile rs = new RandomAccessFile(f, "w");
+                RandomAccessFile rs = new RandomAccessFile(f, "rw");
                 for (int j = 0; j < BlockNumber; j++) {
                     GroupBloomFilter g = BlockMap.get(i * BlockNumber + j);
                     for (int k = 0; k < g.BFUnits; k++) {
@@ -424,6 +424,7 @@ public class HotBF {
     public void Scale() {
         Timer.Context c = scaleT.time();
         Scaled++;
+        System.out.println("=============================================Scale "+Scaled);
         File f = new File("HBF" + (Scaled));
         if (!f.exists()) {
             try {
@@ -445,17 +446,17 @@ public class HotBF {
             newG.setPath("HBF" + Scaled);
             newG.iniBFULRU();
             BlockMap.put(Scaled * BlockNumber + i, newG);
-            // reschedule BlockLRU
-            ConcurrentLinkedQueue<Integer> newBlockLRU = new ConcurrentLinkedQueue<>();
-            for (int j = 0; j < BlockNumber; j++)
-                newBlockLRU.add(Scaled * BlockNumber + j);
-
-            Iterator<Integer> it = BlockLRU.iterator();
-            while (it.hasNext())
-                newBlockLRU.add(it.next());
-
-            BlockLRU = newBlockLRU;
         }
+        // reschedule BlockLRU
+        ConcurrentLinkedQueue<Integer> newBlockLRU = new ConcurrentLinkedQueue<>();
+        for (int j = 0; j < BlockNumber; j++)
+            newBlockLRU.add(Scaled * BlockNumber + j);
+
+        Iterator<Integer> it = BlockLRU.iterator();
+        while (it.hasNext())
+            newBlockLRU.add(it.next());
+
+        BlockLRU = newBlockLRU;
         c.close();
     }
 

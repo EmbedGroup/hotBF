@@ -4,9 +4,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
+import com.embedGroup.metrics.ConsoleReporter;
+import com.embedGroup.metrics.MetricRegistry;
+import com.embedGroup.metrics.Timer;
 import com.embedGroup.hotBF.HotBF.micromonitor;
 
 import org.iota.jota.pow.ICurl;
@@ -129,21 +129,31 @@ public class MicroBenchmark {
     public static void ScaleTest() {
         clear();
         HotBF hot = new HotBF();
-        hot.ini(3, 20, 2, 0.001, 1024 * 8 * 1024 * 100);// capacity=6
+        hot.ini(1, 20, 2, 0.001, 1024 * 8 * 1024 * 100);// capacity=6
         for (int i = 0; i < 7; i++) {
             hot.Insert("9999" + i);
         }
-        hot.ShutDown();
 
-        hot.ini(3, 20, 2, 0.001, 1024 * 8 * 1024 * 100);// capacity=6
         for (int i = 0; i < 7; i++) {
             if (!hot.mayExists("9999" + i)) {
                 System.out.println("miss inserted");
             }
+        }   
+        //hot.print();
+        hot.ShutDown();
+
+        hot=new HotBF();
+        //System.out.println("restart");
+        hot.ini(1, 20, 2, 0.001, 1024 * 8 * 1024 * 100);// capacity=6
+        //hot.print();
+        for (int i = 0; i < 7; i++) {
+            if (!hot.mayExists("9999" + i)) {
+                System.out.println("miss inserted after rebuild");
+            }
         }
 
         for (int i = 0; i < 100; i++) {
-            if (hot.mayExists("9999" + (8 + i))) {
+            if (hot.mayExists("9999" + (9 + i))) {
                 System.out.println("false positive");
             }
         }
@@ -332,6 +342,27 @@ public class MicroBenchmark {
 
         }, "Shutdown Hook"));
         
+    }
+
+    public static void scaleBench(){
+        clear();
+        HotBF hot=new HotBF();
+        hot.ini(3, 1000, 2, 0.001, 100*1024*1024*8);
+        skewdata sd=new skewdata(100000, 0.8);
+        int scales=10;
+        int capacity=hot.BlockMap.get(0).getCapacity();
+        for(int i=0;i<scales;i++){
+            for(int j=0;j<capacity;j++){
+                String address="999"+SeedRandomGenerator.generateNewSeed();
+                hot.Insert(address);
+
+                for(int k=0;k<100;k++){
+                    hot.mayExists(sd.out());
+                }
+            }
+            hot.reporter.report();
+            //GroupBloomFilter.reporter.report();
+        }
     }
 
     public static void warmup(){

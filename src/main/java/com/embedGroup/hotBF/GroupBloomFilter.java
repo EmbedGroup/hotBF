@@ -8,9 +8,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
+import com.embedGroup.metrics.ConsoleReporter;
+import com.embedGroup.metrics.MetricRegistry;
+import com.embedGroup.metrics.Timer;
 
 /**
  * a GroupBloomFilter is consists of a set of independent BlommFilterUnit.
@@ -477,5 +477,9 @@ public class GroupBloomFilter {
             }
         }
         System.out.printf("\n");
+    }
+
+    public int getCapacity(){
+        return Capacity;
     }
 }

@@ -41,7 +41,8 @@ public class App
         //MicroBenchmark.wps();
         //MicroBenchmark.ini_shutdown();
         //Test.skewnesstest();
-        MotivationTest t=new MotivationTest();
-        t.DataMarketPlaceSimu(2.4);
+        //MotivationTest t=new MotivationTest();
+        //t.DataMarketPlaceSimu(2.4);
+        MicroBenchmark.scaleBench();
     }
 }

@@ -5,9 +5,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.MetricAttribute;
-import com.codahale.metrics.MetricRegistry;
+import com.embedGroup.metrics.ConsoleReporter;
+import com.embedGroup.metrics.MetricAttribute;
+import com.embedGroup.metrics.MetricRegistry;
 import org.iota.jota.types.Trytes;
 import org.iota.jota.utils.SeedRandomGenerator;
 
