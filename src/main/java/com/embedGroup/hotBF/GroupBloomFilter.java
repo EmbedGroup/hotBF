@@ -412,7 +412,7 @@ public class GroupBloomFilter {
         Timer.Context c = eliminateT.time();
         int decresed = 0;
         if (Actives < numbers) {
-            System.out.println("No Enough BFU to Eliminate");
+            //System.out.println("No Enough BFU to Eliminate");
             return 0;
         }
         Iterator<Integer> it = BFULRU.iterator();

@@ -1,6 +1,7 @@
 package com.embedGroup.hotBF;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 import com.codahale.metrics.ConsoleReporter;
@@ -312,14 +313,19 @@ public class MicroBenchmark {
     public static void mutithread(){
         //clear();
         HotBF hot=new HotBF();
-        hot.ini(3, 4*1024*8, 2, 0.001, 100*1024*1024*8);
-        int num=4;
+        hot.ini(3, 4*1024*8, 10, 0.001, 100*1024*1024*8);
+        int num=1;
+        skewdata sd=new skewdata(100000*num, 0.8);
+        ArrayList<micromonitor> threads=new ArrayList<>();
         for(int i=0;i<num;i++){
-            micromonitor m=hot.newMicroMonitor();
+            micromonitor m=hot.newMicroMonitor(sd);
+            threads.add(m);
             m.start();
         }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            
+            threads.forEach(t->{
+                t.exit=true;
+            });
             hot.ShutDown();
             hot.reporter.report();
             GroupBloomFilter.reporter.report();

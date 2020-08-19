@@ -475,26 +475,39 @@ public class HotBF {
     class micromonitor extends Thread {
         int index = 0;
         HotBF hot;
-    
-        micromonitor(HotBF h) {
+        public volatile boolean exit=false;
+        skewdata sd;
+        micromonitor(HotBF h,skewdata SkewData) {
             hot = h;
+            sd=SkewData;
         }
 
         public void run() {
-            while (true) {
-                if (index % 100 == 0) {
-                    hot.Insert(SeedRandomGenerator.generateNewSeed());
+            String indertaddr=null;
+            while (!false) {
+                if(index % 1000==0){
                     System.out.println(this.getId() + " index " + index);
-                } else {
-                    hot.mayExists(SeedRandomGenerator.generateNewSeed());
+                }
+                if (index % 100 == 0) {
+                    indertaddr=SeedRandomGenerator.generateNewSeed();
+                    hot.Insert(indertaddr);
+                    
+                }else if(index%150==0){
+                    if(!hot.mayExists(indertaddr)){
+                        System.out.println("False Negative");
+                        return;
+                    }
+                } 
+                else {
+                    hot.mayExists(sd.out());
                 }
                 index++;
             }
         }
     }
 
-    public micromonitor newMicroMonitor() {
-        return new micromonitor(this);
+    public micromonitor newMicroMonitor(skewdata sd) {
+        return new micromonitor(this,sd);
     }
 
 }

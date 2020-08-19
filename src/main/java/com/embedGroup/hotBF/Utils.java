@@ -1,5 +1,6 @@
 package com.embedGroup.hotBF;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -8,6 +9,7 @@ import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricAttribute;
 import com.codahale.metrics.MetricRegistry;
 import org.iota.jota.types.Trytes;
+import org.iota.jota.utils.SeedRandomGenerator;
 
 public class Utils {
     
@@ -64,4 +66,15 @@ public class Utils {
         return reporter;
         
     }
+
+    public static String[] GenerateAddre(int amount){
+        String[] ss=new String[amount];
+        for(int i=0;i<amount;i++){
+            ss[i]=SeedRandomGenerator.generateNewSeed();
+        }
+        return ss;
+    }
+
+    
+        
 }

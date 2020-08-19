@@ -31,14 +31,17 @@ public class App
         //GroupBloomFilter g=new GroupBloomFilter(4*1024*8, 2, 0.001);
         //Test.zmq();
         //MicroBenchmark.clear();
-        
+        //Test.skewnesstest();
         //MicroBenchmark.randomCheckLatency();
         //MicroBenchmark.dencyTest();
         //MicroBenchmark.insight();
-        MicroBenchmark.clear();
+        //MicroBenchmark.clear();
         //MicroBenchmark.warmup();
-        MicroBenchmark.mutithread();
+        //MicroBenchmark.mutithread();
         //MicroBenchmark.wps();
         //MicroBenchmark.ini_shutdown();
+        //Test.skewnesstest();
+        MotivationTest t=new MotivationTest();
+        t.DataMarketPlaceSimu(2.4);
     }
 }

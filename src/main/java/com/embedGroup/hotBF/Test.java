@@ -6,10 +6,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.RandomAccessFile;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
+import com.embedGroup.hotBF.skewdata;
 
 
 public class Test {
@@ -233,5 +236,28 @@ public class Test {
         }, "Shutdown Hook"));
     }
 
+    public static void skewnesstest(){
+        
+
+        int amount=100;
+        double skew=1.0;
+        
+        
+        skewdata sd=new skewdata(amount, skew);
+        HashMap<String,Integer> sum=new HashMap<>();
+        for(int i=0;i<amount;i++){
+            sum.put(sd.data[i], 0);
+        }
+
+        for(int i=0;i<amount*1000;i++){
+            String s=sd.out();
+            sum.put(s, sum.get(s)+1);
+        }
+
+        for(int i=0;i<amount;i++){
+            double fre=(double)sum.get(sd.data[i]) / 1000;
+            System.out.println(sd.dist.frequency[i]+":"+fre);
+        }
+    }
 
 }
