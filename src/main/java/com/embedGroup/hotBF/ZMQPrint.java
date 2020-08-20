@@ -33,9 +33,9 @@ class ZMQPrint extends Thread{
             
             if (data[0].equals("tx")) {
                 
-                 //System.out.println("NEW TRANSACTION" + "\n" + "Transaction hash: " + data[1]
-                 //+ "\n" + "Address: "+ data[2] + "\n" + "Value: " + data[3] + "\n" + "Tag: " +
-                 //data[4] + "\n");
+                 System.out.println("NEW TRANSACTION" + "\n" + "Transaction hash: " + data[1]
+                 + "\n" + "Address: "+ data[2] + "\n" + "Value: " + data[3] + "\n" + "Tag: " +
+                 data[4] + "\n");
                 String addr=data[2];
                 lo.put(addr);
             }

@@ -20,6 +20,7 @@ import org.iota.jota.dto.response.WereAddressesSpentFromResponse;
 import org.iota.jota.model.Input;
 import org.iota.jota.model.Transaction;
 import org.iota.jota.model.Transfer;
+import org.iota.jota.utils.Checksum;
 import org.iota.jota.utils.IotaAPIUtils;
 import org.iota.jota.utils.SeedRandomGenerator;
 import org.zeromq.ZContext;
@@ -101,10 +102,13 @@ public class Jota {
     }
 
     public SendTransferResponse sendMessage(String seed, String reciveAddress, String message) {
+        if(reciveAddress.length()==81){
+            reciveAddress=Checksum.addChecksum(reciveAddress);
+        }
         List<Transfer> transfers = new ArrayList<>();
         transfers.add(new Transfer(reciveAddress, 0, message, "TESTTAG"));
         SendTransferResponse res = api.sendTransfer(seed, security, depth, minWeightMagnitude, transfers, null, null,
-                false, false, null);
+                false, true, null);
         return res;
     }
 
@@ -151,9 +155,9 @@ public class Jota {
 
                 if (data[0].equals("tx")) {
                     txs.put(data[1], 1);
-                    // System.out.println("NEW TRANSACTION" + "\n" + "Transaction hash: " + data[1]
-                    // + "\n" + "Address: "+ data[2] + "\n" + "Value: " + data[3] + "\n" + "Tag: " +
-                    // data[4] + "\n");
+                     //System.out.println("NEW TRANSACTION" + "\n" + "Transaction hash: " + data[1]
+                     //+ "\n" + "Address: "+ data[2] + "\n" + "Value: " + data[3] + "\n" + "Tag: " +
+                     //data[4] + "\n");
                 }
                 if (data[0].equals("sn")) {
                     txs.put(data[2], 2);

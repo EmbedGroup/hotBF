@@ -40,7 +40,6 @@ public class GroupBloomFilter {
 
     public static MetricRegistry metrics = new MetricRegistry();
     public static ConsoleReporter reporter = Utils.getreport(metrics);
-    
 
     public static Timer addT = metrics.timer("Group add");
     public static Timer checkBFUWithHashdT = metrics.timer("Group checkBFUWithHashValues");
@@ -268,7 +267,7 @@ public class GroupBloomFilter {
      */
     public int Insert(String address) {
         Timer.Context c = insertT.time();
-        int loadin=0;
+        int loadin = 0;
         // load all BFU into memory
         for (int i = 0; i < BFUnits; i++) {
             if (!Active[i]) {
@@ -282,6 +281,10 @@ public class GroupBloomFilter {
         }
         Entities++;
         Actives = BFUnits;
+        //insert new address
+        /*if (!check(address)) {
+            Entities++;
+        }*/
         // note that,this time we dont't update BFULRU,cause they don't change BFU
         // hotness
 
@@ -310,8 +313,7 @@ public class GroupBloomFilter {
     /**
      * First check BFUs in memory,then if needed,load in BFU to check .When a
      * negative result is obtained, move the corresponding BFU to the MRU end,
-     * otherwise no change is made
-     * Load in checked unactive BFU
+     * otherwise no change is made Load in checked unactive BFU
      */
     public mayExistsResponce mayExists(String address) {
         Timer.Context c = mayexistsT.time();
@@ -412,7 +414,7 @@ public class GroupBloomFilter {
         Timer.Context c = eliminateT.time();
         int decresed = 0;
         if (Actives < numbers) {
-            //System.out.println("No Enough BFU to Eliminate");
+            // System.out.println("No Enough BFU to Eliminate");
             return 0;
         }
         Iterator<Integer> it = BFULRU.iterator();
@@ -479,7 +481,7 @@ public class GroupBloomFilter {
         System.out.printf("\n");
     }
 
-    public int getCapacity(){
+    public int getCapacity() {
         return Capacity;
     }
 }

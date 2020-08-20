@@ -245,11 +245,15 @@ public class MotivationTest {
 
                 Provider = Getnode(providers, zp);
                 System.out.println("Got:" + Consumer + "<->" + Provider);
-                String dataReciver = jota.getAddress(Consumer, 0, true);
+                String dataReciver = jota.getAddress(Consumer, 999999, true);
+                System.out.println(dataReciver);
                 String valueReciver = jota.getAddress(Provider, 0, true);
-
-                jota.sendMessage(Provider, dataReciver, "DATA");
+                for (int i = 0; i < 10; i++) {
+                    jota.sendMessage(Provider, dataReciver, "DATA");
+                }
+                System.out.println(valueReciver);
                 SendTransferResponse res = jota.sendValue(Consumer, valueReciver, 10);
+
                 Transaction tailTx = res.getTransactions().get(1);
 
                 long start = System.currentTimeMillis();
@@ -293,7 +297,7 @@ public class MotivationTest {
     }
 
     private int providerNumber = 50;
-    private int consumerNuber = 5;
+    private int consumerNuber = 1;
     private double skewness;
 
     public void DataMarketPlaceSimu(double skew) {
@@ -405,8 +409,8 @@ public class MotivationTest {
             if (System.currentTimeMillis() - start > 60 * 60 * 1000) {
                 break;
             }
-            ArrayList<SendTransferResponse> ress=new ArrayList<>();
-            ArrayList<String> sendConsumers=new ArrayList<>();
+            ArrayList<SendTransferResponse> ress = new ArrayList<>();
+            ArrayList<String> sendConsumers = new ArrayList<>();
             for (int i = 0; i < consumerNuber; i++) {
                 Random r = new Random();
                 double d = r.nextDouble();
@@ -429,18 +433,19 @@ public class MotivationTest {
                 }
             }
 
-            //wait until confirmed
-            long Startwait=System.currentTimeMillis();
-            while(true){
-                if(ress.isEmpty()) break;
-                if(System.currentTimeMillis()-Startwait > 60*1000){
-                    //replace unconfimed seed
-                    for(int i=0;i<sendConsumers.size();i++){
+            // wait until confirmed
+            long Startwait = System.currentTimeMillis();
+            while (true) {
+                if (ress.isEmpty())
+                    break;
+                if (System.currentTimeMillis() - Startwait > 60 * 1000) {
+                    // replace unconfimed seed
+                    for (int i = 0; i < sendConsumers.size(); i++) {
                         System.out.println(" SEED LOCKED,SEED REPLACE");
                         System.out.println(sendConsumers.get(i));
-                        String newconsumer="";
+                        String newconsumer = "";
                         if (backup.size() > 0) {
-                            newconsumer=backup.get(0);
+                            newconsumer = backup.get(0);
                             int index = consumers.indexOf(sendConsumers.get(i));
                             consumers.remove(sendConsumers.get(i));
                             consumers.add(index, backup.get(0));
@@ -450,19 +455,20 @@ public class MotivationTest {
                     }
                     break;
                 }
-                //check confirm
-                for(int i=0;i<ress.size();i++){
+                // check confirm
+                for (int i = 0; i < ress.size(); i++) {
                     Transaction tailTx = ress.get(i).getTransactions().get(1);
                     if (jota.listener.txs.get(tailTx.getHash()) == 2) {
                         ress.remove(i);
                         sendConsumers.remove(i);
-                        if(ress.size()==0) break;
+                        if (ress.size() == 0)
+                            break;
                     }
                 }
                 try {
                     Thread.sleep(500);
                 } catch (Exception e) {
-                    //TODO: handle exception
+                    // TODO: handle exception
                 }
             }
 
