@@ -30,6 +30,7 @@ public class HotBF {
     public int[] Scales;// scale times for Group Bloom Filters
     private int Scaled = 0;// Scaled=max(Scales)
     ConcurrentLinkedQueue<Integer> BlockLRU = new ConcurrentLinkedQueue<>();
+    
     HashMap<Integer, GroupBloomFilter> BlockMap = new HashMap<>();
 
     public MetricRegistry metrics = new MetricRegistry();
@@ -45,7 +46,7 @@ public class HotBF {
     Timer shutT = metrics.timer("HotBF shutdown");
     Timer tryEliminateT = metrics.timer("HotBF tryEliminate");
     Timer totalActiveT = metrics.timer("HotBF totalActive");
-
+    Timer BlockLRUT=metrics.timer("HotBF BlockLRU");
     /**
      * 
      * @param prefixlength
@@ -395,9 +396,10 @@ public class HotBF {
         for (int i = Scales[prefix]; i >= 0; i--) {
             int currentBlock = i * BlockNumber + prefix;
             // update BlockLRU
+            Timer.Context ctx=BlockLRUT.time();
             BlockLRU.remove(currentBlock);
             BlockLRU.add(currentBlock);
-
+            ctx.close();
             // Timer.Context ctx=t2.time();
             mayExistsResponce result = BlockMap.get(currentBlock).mayExists(address);
             // ctx.close();

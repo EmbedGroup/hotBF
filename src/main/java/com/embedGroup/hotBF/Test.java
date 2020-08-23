@@ -260,4 +260,8 @@ public class Test {
         }
     }
 
+    public static void concurrentlinkedhashmap(){
+        
+        ConcurrentLinkedHashMap<Integer,Integer> map=new Concurrent
+    }
 }

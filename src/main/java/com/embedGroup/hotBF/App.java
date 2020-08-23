@@ -35,14 +35,14 @@ public class App
         //MicroBenchmark.randomCheckLatency();
         //MicroBenchmark.dencyTest();
         //MicroBenchmark.insight();
-        //MicroBenchmark.clear();
+        MicroBenchmark.clear();
         //MicroBenchmark.warmup();
-        //MicroBenchmark.mutithread();
+        MicroBenchmark.mutithread();
         //MicroBenchmark.wps();
         //MicroBenchmark.ini_shutdown();
         //Test.skewnesstest();
-        MotivationTest t=new MotivationTest();
-        t.DataMarketPlaceSimu(0.0);
+        //MotivationTest t=new MotivationTest();
+        //t.DataMarketPlaceSimu(0.0);
         //MicroBenchmark.scaleBench();
     }
 }
