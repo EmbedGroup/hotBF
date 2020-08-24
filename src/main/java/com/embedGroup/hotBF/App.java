@@ -35,7 +35,8 @@ public class App
         //MicroBenchmark.randomCheckLatency();
         //MicroBenchmark.dencyTest();
         //MicroBenchmark.insight();
-        MicroBenchmark.clear();
+        //MicroBenchmark.clear();
+
         //MicroBenchmark.warmup();
         MicroBenchmark.mutithread();
         //MicroBenchmark.wps();

@@ -228,6 +228,15 @@ public class HotBF {
             String addr = Utils.IntToTrytes(i, prefixLength) + "AAAAAAA";
             mayExists(addr);
         }
+        int activeB=0;
+        for(int i=0;i<BlockNumber;i++){
+            if(BlockMap.get(i).Size()>=1){
+                activeB++;
+            }
+        }
+        System.out.println("warmup:"+activeB);
+        reporter.report();
+        GroupBloomFilter.reporter.report();
     }
 
     public void savaData() {
@@ -503,8 +512,10 @@ public class HotBF {
         public void run() {
             String indertaddr=null;
             while (!exit) {
+                if(index==682)  break;
                 if(index % 1000==0){
                     System.out.println(this.getId() + " index " + index);
+                    
                 }
                 if (index % 100 == 0) {
                     indertaddr=SeedRandomGenerator.generateNewSeed();

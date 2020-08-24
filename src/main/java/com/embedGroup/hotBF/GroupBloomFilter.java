@@ -49,6 +49,8 @@ public class GroupBloomFilter {
     public static Timer insertT = metrics.timer("Group insert");
     public static Timer loadinBFUT = metrics.timer("Group LoadinBFU");
     public static Timer mayexistsT = metrics.timer("Group mayExists");
+    public static Timer mayexixsts1T = metrics.timer("Group mayExixsts 1");
+    public static Timer mayexixsts2T = metrics.timer("Group mayExixsts 2");
 
     // Deque
     ConcurrentLinkedDeque<Integer> BFULRU = new ConcurrentLinkedDeque<>();// BFULRU was born empty
@@ -281,10 +283,10 @@ public class GroupBloomFilter {
         }
         Entities++;
         Actives = BFUnits;
-        //insert new address
-        /*if (!check(address)) {
-            Entities++;
-        }*/
+        // insert new address
+        /*
+         * if (!check(address)) { Entities++; }
+         */
         // note that,this time we dont't update BFULRU,cause they don't change BFU
         // hotness
 
@@ -320,68 +322,76 @@ public class GroupBloomFilter {
         try {
             int[] keys = getHashValues(address);
 
-            // check BFUs in memory
-            for (int i = 0; i < BFUnits; i++) {
-                if (Active[i]) {
-                    boolean result = checkBFUWithHashValues(i, keys);
-                    if (result == false) {
+            Timer.Context c1 = mayexixsts1T.time();
+            try {
 
-                        // update BFULRU
-                        // Since Deque, ew can view the tail of the linked list to avoid unnecessary
-                        // operations
-                        if (BFULRU.peekLast() != i) {
+                // check BFUs in memory
+                for (int i = 0; i < BFUnits; i++) {
+                    if (Active[i]) {
+                        boolean result = checkBFUWithHashValues(i, keys);
+                        if (result == false) {
+                            // update BFULRU
+                            // Since Deque, ew can view the tail of the linked list to avoid unnecessary
+                            // operations
+                            if (BFULRU.peekLast() != i) {
+                                BFULRU.remove(i);
+                                BFULRU.add(i);
+                            }
+                            // get result;
+                            return (new mayExistsResponce(false, 0));
+                        }
+                    }
+                }
+                // else,need to bring other BFUs into memory
+                if (Actives == BFUnits)
+                    return (new mayExistsResponce(true, 0));
+            } finally {
+                c1.close();
+            }
+
+            Timer.Context c2 = mayexixsts2T.time();
+            try { // load in needed BFUs
+                  // if result is true,persist all those in memory
+                  // if result is false,persist only the negative BFU
+                HashMap<Integer, BloomFilter<String>> loadedin = new HashMap<>();
+                for (int i = 0; i < BFUnits; i++) {
+                    if (!Active[i]) {
+                        loadtimes++;
+                        // read into memory
+                        BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+                        bf.load(path, getOffset(index, i), BFUsize);
+                        loadedin.put(i, bf);
+                        Active[i] = true;
+                        Actives++;
+
+                        // check
+                        boolean result = true;
+                        for (int j = 0; j < HashFunctions; j++) {
+                            if (!bf.getBit(keys[i * HashFunctions + j])) {
+                                result = false;
+                                break;
+                            }
+                        }
+                        if (result == false) {
+                            // The one who contributed
                             BFULRU.remove(i);
                             BFULRU.add(i);
+                            Group.put(i, bf);
+                            return (new mayExistsResponce(false, 1));
                         }
-                        // get result;
-                        return (new mayExistsResponce(false, 0));
+
                     }
                 }
-            }
-            // else,need to bring other BFUs into memory
-            if (Actives == BFUnits)
-                return (new mayExistsResponce(true, 0));
-
-            // load in needed BFUs
-            // if result is true,persist all those in memory
-            // if result is false,persist only the negative BFU
-            HashMap<Integer, BloomFilter<String>> loadedin = new HashMap<>();
-            for (int i = 0; i < BFUnits; i++) {
-                if (!Active[i]) {
-                    loadtimes++;
-                    // read into memory
-                    BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
-                    bf.load(path, getOffset(index, i), BFUsize);
-                    loadedin.put(i, bf);
-                    Active[i] = true;
-                    Actives++;
-
-                    // check
-                    boolean result = true;
-                    for (int j = 0; j < HashFunctions; j++) {
-                        if (!bf.getBit(keys[i * HashFunctions + j])) {
-                            result = false;
-                            break;
-                        }
-                    }
-
-                    if (result == false) {
-                        // The one who contributed
-                        BFULRU.remove(i);
-                        BFULRU.add(i);
+                for (int i = 0; i < BFUnits; i++) {
+                    BloomFilter<String> bf = loadedin.get(i);
+                    if (bf != null) {
                         Group.put(i, bf);
-                        return (new mayExistsResponce(false, 1));
                     }
-
                 }
+                return (new mayExistsResponce(true, loadedin.size()));
+            } finally {
+                c2.close();
             }
-            for (int i = 0; i < BFUnits; i++) {
-                BloomFilter<String> bf = loadedin.get(i);
-                if (bf != null) {
-                    Group.put(i, bf);
-                }
-            }
-            return (new mayExistsResponce(true, loadedin.size()));
         } finally {
             c.close();
         }

@@ -321,11 +321,12 @@ public class MicroBenchmark {
 
     
     public static void mutithread(){
-        //clear();
+        clear();
         HotBF hot=new HotBF();
         hot.ini(3, 4*1024*8, 2, 0.001, 100*1024*1024*8);
-        int num=1;
-        skewdata sd=new skewdata(100000*num, 0.8);
+        hot.WarmUp();
+        int num=4;
+        skewdata sd=new skewdata(100000*num, 0.0);
         ArrayList<micromonitor> threads=new ArrayList<>();
         for(int i=0;i<num;i++){
             micromonitor m=hot.newMicroMonitor(sd);
