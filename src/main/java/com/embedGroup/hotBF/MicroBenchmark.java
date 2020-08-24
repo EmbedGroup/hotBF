@@ -323,9 +323,9 @@ public class MicroBenchmark {
     public static void mutithread(){
         //clear();
         HotBF hot=new HotBF();
-        hot.ini(3, 4*1024*8, 10, 0.001, 100*1024*1024*8);
+        hot.ini(3, 4*1024*8, 2, 0.001, 100*1024*1024*8);
         int num=1;
-        skewdata sd=new skewdata(100000*num, 10.0);
+        skewdata sd=new skewdata(100000*num, 0.8);
         ArrayList<micromonitor> threads=new ArrayList<>();
         for(int i=0;i<num;i++){
             micromonitor m=hot.newMicroMonitor(sd);
@@ -339,6 +339,7 @@ public class MicroBenchmark {
             hot.ShutDown();
             hot.reporter.report();
             GroupBloomFilter.reporter.report();
+            System.out.println("mayExixsts Load times "+GroupBloomFilter.loadtimes);
 
         }, "Shutdown Hook"));
         
@@ -347,20 +348,25 @@ public class MicroBenchmark {
     public static void scaleBench(){
         clear();
         HotBF hot=new HotBF();
-        hot.ini(3, 1000, 2, 0.001, 100*1024*1024*8);
+        hot.ini(1, 10000, 2, 0.001, 100*1024*1024*8);
         skewdata sd=new skewdata(100000, 0.8);
         int scales=10;
         int capacity=hot.BlockMap.get(0).getCapacity();
         for(int i=0;i<scales;i++){
-            for(int j=0;j<capacity;j++){
-                String address="999"+SeedRandomGenerator.generateNewSeed();
-                hot.Insert(address);
-
-                for(int k=0;k<100;k++){
-                    hot.mayExists(sd.out());
+            for(int j=0;j<27;j++){
+                for(int k=0;k<capacity;k++){ 
+                    String address=Utils.IntToTrytes(j, 1)+SeedRandomGenerator.generateNewSeed();
+                    hot.Insert(address);
                 }
             }
+            for(int k=0;k<20000;k++){
+                hot.mayExists(sd.out());
+            }
+            
+
+
             hot.reporter.report();
+            //GroupBloomFilter.reporter.report();
             //GroupBloomFilter.reporter.report();
         }
     }

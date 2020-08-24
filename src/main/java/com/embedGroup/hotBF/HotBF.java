@@ -8,12 +8,14 @@ import java.io.FileWriter;
 import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
 import com.embedGroup.metrics.ConsoleReporter;
 import com.embedGroup.metrics.MetricRegistry;
 import com.embedGroup.metrics.Timer;
+import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import com.embedGroup.hotBF.GroupBloomFilter.mayExistsResponce;
 import com.mongodb.Block;
 
@@ -29,8 +31,8 @@ public class HotBF {
     private int BlockNumber;
     public int[] Scales;// scale times for Group Bloom Filters
     private int Scaled = 0;// Scaled=max(Scales)
-    ConcurrentLinkedQueue<Integer> BlockLRU = new ConcurrentLinkedQueue<>();
-    
+    //ConcurrentLinkedQueue<Integer> BlockLRU = new ConcurrentLinkedQueue<>();
+    ConcurrentLinkedHashMap<Integer,Integer> BlockLRU;
     HashMap<Integer, GroupBloomFilter> BlockMap = new HashMap<>();
 
     public MetricRegistry metrics = new MetricRegistry();
@@ -73,7 +75,6 @@ public class HotBF {
         // At First,no Active BFU
 
         // load metadata
-
         File f = new File("HBF-Meta");
         if (!f.exists()) {
             // Bootstrap,Initialize HBF file
@@ -100,10 +101,10 @@ public class HotBF {
                 g.iniBFULRU();
                 BlockMap.put(i, g);
             }
+            BlockLRU=new ConcurrentLinkedHashMap.Builder<Integer,Integer>().maximumWeightedCapacity(BlockNumber).build();
             // initialize BlockLRU,BFULRU
             for (int i = 0; i < BlockNumber; i++) {
-                BlockLRU.add(i);
-
+                BlockLRU.put(i, i);
             }
 
         } else {
@@ -118,10 +119,11 @@ public class HotBF {
                         Scaled = Scales[i];
                 }
                 // BLockLRU
+                BlockLRU=new ConcurrentLinkedHashMap.Builder<Integer,Integer>().maximumWeightedCapacity(BlockNumber*(Scaled+1)).build();
                 String queue = br.readLine();
                 String[] q = queue.split(" ");
                 for (String s : q) {
-                    BlockLRU.add(Integer.valueOf(s));
+                    BlockLRU.put(Integer.valueOf(s),Integer.valueOf(s));
                 }
                 
                 // add Scaled Blocks
@@ -153,7 +155,7 @@ public class HotBF {
                                 // BlockMap.get(i * BlockNumber + k).LoadInBFU(j); massive cost way
                                 BloomFilter<String> bf = new FilterBuilder(BFUsize, hashfunctions).buildBloomFilter();
 
-                                ra.seek( ((long)j * g.Size()) + k * BFUsize);
+                                ra.seek( (((long)j * g.Size()) + k * BFUsize) / 8);
                                 ra.read(tmp);
                                 bf.setBloom(tmp);
                                 g.Group.put(k, bf);
@@ -198,7 +200,8 @@ public class HotBF {
             bw.write("\n");
 
             // BlockLRU
-            Iterator<Integer> it = BlockLRU.iterator();
+            Set<Integer> lru=BlockLRU.ascendingKeySet();//Cold->Hot
+            Iterator<Integer> it = lru.iterator();
             while (it.hasNext()) {
                 bw.write(it.next() + " ");
             }
@@ -242,7 +245,7 @@ public class HotBF {
                     GroupBloomFilter g = BlockMap.get(i * BlockNumber + j);
                     for (int k = 0; k < g.BFUnits; k++) {
                         if (g.isActive(k)) {
-                            rs.seek( ((long)j * g.Size() + k * BFUsize));
+                            rs.seek( ((long)j * g.Size() + k * BFUsize) / 8);
                             rs.write(g.getBFU(k).getBloomAsByteArray());
                         }
                     }
@@ -259,7 +262,7 @@ public class HotBF {
         return prefixLength;
     }
 
-    public ConcurrentLinkedQueue<Integer> BlockLRU() {
+    public ConcurrentLinkedHashMap<Integer, Integer> BlockLRU() {
         return BlockLRU;
     }
 
@@ -267,7 +270,8 @@ public class HotBF {
         Timer.Context c = eliminateT.time();
         // choose from numbers oldest Block(with BFUs>0 in memory),everyone choose
         // oldest BFU to remove
-        Iterator<Integer> it = BlockLRU.iterator();
+        Set<Integer> lru=BlockLRU.ascendingKeySet();
+        Iterator<Integer> it = lru.iterator();
         int target = numbers;
 
         // gather enough activeBFUs
@@ -276,6 +280,9 @@ public class HotBF {
         while (it.hasNext()) {
             int t = it.next();
             int BFUs;
+            if(BlockMap.get(t)==null){
+                System.out.println("NULL GOT "+t);
+            }
             if ((BFUs = BlockMap.get(t).Actives()) > 0) {
                 activeGBF++;
                 activeBFU += BFUs;
@@ -283,7 +290,7 @@ public class HotBF {
                     break;
             }
         }
-        it = BlockLRU.iterator();
+        it = lru.iterator();
         if (activeGBF >= numbers) {
             // everyone eliminate one BFU
             while (target > 0) {
@@ -361,8 +368,9 @@ public class HotBF {
         remainder -= G.Insert(address);// load all BFUs of block into memory
 
         // move block to queue tail
-        BlockLRU.remove(currentBlock);
-        BlockLRU.add(currentBlock);
+        //BlockLRU.remove(currentBlock);
+        //BlockLRU.add(currentBlock);
+        BlockLRU.get(currentBlock);
 
         // if hit the threshold,try remove BFUs following LRU
         if (remainder < 0) {
@@ -397,8 +405,9 @@ public class HotBF {
             int currentBlock = i * BlockNumber + prefix;
             // update BlockLRU
             Timer.Context ctx=BlockLRUT.time();
-            BlockLRU.remove(currentBlock);
-            BlockLRU.add(currentBlock);
+            //BlockLRU.remove(currentBlock);
+            //BlockLRU.add(currentBlock);
+            BlockLRU.get(currentBlock);
             ctx.close();
             // Timer.Context ctx=t2.time();
             mayExistsResponce result = BlockMap.get(currentBlock).mayExists(address);
@@ -450,20 +459,26 @@ public class HotBF {
             BlockMap.put(Scaled * BlockNumber + i, newG);
         }
         // reschedule BlockLRU
-        ConcurrentLinkedQueue<Integer> newBlockLRU = new ConcurrentLinkedQueue<>();
-        for (int j = 0; j < BlockNumber; j++)
-            newBlockLRU.add(Scaled * BlockNumber + j);
+        ConcurrentLinkedHashMap<Integer,Integer> newBlockLRU=new ConcurrentLinkedHashMap.Builder<Integer,Integer>().maximumWeightedCapacity(BlockNumber*(Scaled+1)).build();
+        int index=Scaled*BlockNumber;
+        for (int j = 0; j < BlockNumber; j++){
+            newBlockLRU.put(index+j, index+j);
+        }
 
-        Iterator<Integer> it = BlockLRU.iterator();
-        while (it.hasNext())
-            newBlockLRU.add(it.next());
+        Set<Integer> lru=BlockLRU.ascendingKeySet();        
+        Iterator<Integer> it = lru.iterator();
+        while (it.hasNext()){
+            int oldindex=it.next();
+            newBlockLRU.put(oldindex, oldindex);
+        }
 
         BlockLRU = newBlockLRU;
         c.close();
     }
 
     public void print() {
-        Iterator<Integer> it = BlockLRU.iterator();
+        Set<Integer> lru=BlockLRU.ascendingKeySet();
+        Iterator<Integer> it = lru.iterator();
         System.out.printf("BlockLRU:");
         while (it.hasNext()) {
             System.out.printf("%d ", it.next().intValue());
@@ -487,7 +502,7 @@ public class HotBF {
 
         public void run() {
             String indertaddr=null;
-            while (!false) {
+            while (!exit) {
                 if(index % 1000==0){
                     System.out.println(this.getId() + " index " + index);
                 }

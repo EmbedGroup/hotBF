@@ -388,7 +388,7 @@ public class GroupBloomFilter {
     }
 
     public long getOffset(int block, int Units) {
-        return (long) block * Size + Units * BFUsize;
+        return ((long) block * Size + Units * BFUsize) / 8;
     }
 
     public BloomFilter<String> getBFU(int BFU) {
@@ -426,7 +426,7 @@ public class GroupBloomFilter {
             BloomFilter<String> bf = Group.get(t);
             if (Active[t] && bf != null) {
                 // Group.get(t).save(path, getOffset(index, t), BFUsize);// save before remove
-                bf.save(path, (long) index * Size + t * BFUsize, BFUsize);
+                bf.save(path, ((long) index * Size + t * BFUsize) / 8, BFUsize);
                 Group.remove(t);// remove BFU
                 savetimes++;
                 Active[t] = false;
