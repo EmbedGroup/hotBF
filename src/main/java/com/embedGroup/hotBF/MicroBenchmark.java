@@ -326,7 +326,7 @@ public class MicroBenchmark {
         hot.ini(3, 4*1024*8, 2, 0.001, 100*1024*1024*8);
         //hot.WarmUp();
         int num=1;
-        skewdata sd=new skewdata(100000*num, 0.0);
+        skewdata sd=new skewdata(100000*num, 0.8);
         ArrayList<micromonitor> threads=new ArrayList<>();
         for(int i=0;i<num;i++){
             micromonitor m=hot.newMicroMonitor(sd);

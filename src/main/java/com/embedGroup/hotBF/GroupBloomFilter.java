@@ -2,6 +2,7 @@ package com.embedGroup.hotBF;
 
 import java.io.BufferedWriter;
 import java.nio.file.Path;
+import java.security.acl.Group;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
@@ -317,7 +318,8 @@ public class GroupBloomFilter {
      * negative result is obtained, move the corresponding BFU to the MRU end,
      * otherwise no change is made Load in checked unactive BFU
      */
-    public mayExistsResponce mayExists(String address) {
+    /*
+     public mayExistsResponce mayExists(String address) {
         Timer.Context c = mayexistsT.time();
         try {
             int[] keys = getHashValues(address);
@@ -395,6 +397,49 @@ public class GroupBloomFilter {
         } finally {
             c.close();
         }
+    }*/
+
+    //mayexists scheme2,loadin all missing BFU
+    public mayExistsResponce mayExists(String address) {
+        
+        int[] keys = getHashValues(address);
+        
+        for (int i = 0; i < BFUnits; i++) {
+            if (Active[i]) {
+                boolean result = checkBFUWithHashValues(i, keys);
+                if (result == false) {
+                    return (new mayExistsResponce(false, 0));
+                }
+            }
+        }
+        if (Actives == BFUnits)
+            return (new mayExistsResponce(true, 0));
+
+        int loadedin=0;
+        for (int i = 0; i < BFUnits; i++) {
+            if (!Active[i]) {
+                loadtimes++;
+                // read into memory
+                BloomFilter<String> bf = new FilterBuilder(BFUsize, HashFunctions).buildBloomFilter();
+                bf.load(path, getOffset(index, i), BFUsize);
+                Group.put(i, bf);
+                loadedin++;
+            }
+        }
+
+        for (int i = 0; i < BFUnits; i++) {
+            if (Active[i]) {
+                boolean result = checkBFUWithHashValues(i, keys);
+                if (result == false) {
+                    if (BFULRU.peekLast() != i) {
+                        BFULRU.remove(i);
+                        BFULRU.add(i);
+                    }
+                    return (new mayExistsResponce(false, loadedin));
+                }
+            }
+        }
+        return (new mayExistsResponce(true, loadedin));
     }
 
     public long getOffset(int block, int Units) {

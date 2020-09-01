@@ -275,7 +275,7 @@ public class HotBF {
         return BlockLRU;
     }
 
-    public void Eliminated(int numbers) {
+    /*public void Eliminated(int numbers) {
         Timer.Context c = eliminateT.time();
         // choose from numbers oldest Block(with BFUs>0 in memory),everyone choose
         // oldest BFU to remove
@@ -337,7 +337,25 @@ public class HotBF {
         }
         c.close();
     }
-
+*/
+//Eliminate scheme2,Eliminate LRU Blocks
+public void Eliminated(int numbers) {
+    Set<Integer> lru = BlockLRU.ascendingKeySet();
+    Iterator<Integer> it = lru.iterator();
+    int totalremoved=0;
+    while(it.hasNext()){
+        int t=it.next();
+        GroupBloomFilter gb=BlockMap.get(t);
+        if(gb != null && gb.Actives()>0){
+            int removed=gb.EliminateBFU(gb.Actives());
+            totalremoved+=removed;
+            if(totalremoved > numbers){
+                remainder+=totalremoved;
+                break;
+            }
+        }
+    }
+}
     // Total Active BFUs in memory
     public int TotalActives() {
         Timer.Context c = totalActiveT.time();
@@ -349,8 +367,9 @@ public class HotBF {
         return result;
     }
 
+    //obsolete
     // Timer t3=metrics.timer("Elininate");
-    public void tryEliminated(int BFUs) {
+/*    public void tryEliminated(int BFUs) {
         Timer.Context c = tryEliminateT.time();
         int T = TotalActives();
         int limitedBFU = limitedSize / BFUsize;
@@ -360,7 +379,7 @@ public class HotBF {
             // ctx.close();
         }
         c.close();
-    }
+    }*/
 
     /**
      * Obtain the block number according to the prefix of the address, load all BFUs
