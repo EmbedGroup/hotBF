@@ -26,7 +26,8 @@ public class HotBF {
     private int BFUsize;
     private int hashFunctions;
     private int BFunits;
-    double P;
+    private double P;
+    public double BFU_P;
     private int limitedSize;
     private int BlockNumber;
     public int[] Scales;// scale times for Group Bloom Filters
@@ -37,6 +38,7 @@ public class HotBF {
 
     public MetricRegistry metrics = new MetricRegistry();
     public ConsoleReporter reporter = Utils.getreport(metrics);
+    public int GlobalAccess=0;
 
     public int remainder;// left space in memory
     Timer eliminateT = metrics.timer("HotBF eliminate");
@@ -66,6 +68,8 @@ public class HotBF {
         P = p;
         limitedSize = limitedsize;
         remainder = limitedsize / BFUsize;
+        BFU_P=(double)1.0 / Math.pow(2, hashfunctions);
+
 
         BlockNumber = (int) Math.pow(27, prefixLength);
         GroupBloomFilter gb = new GroupBloomFilter(BFUsize, hashFunctions, P);
@@ -103,9 +107,9 @@ public class HotBF {
             }
             BlockLRU=new ConcurrentLinkedHashMap.Builder<Integer,Integer>().maximumWeightedCapacity(BlockNumber).build();
             // initialize BlockLRU,BFULRU
-            for (int i = 0; i < BlockNumber; i++) {
+            /*for (int i = 0; i < BlockNumber; i++) {
                 BlockLRU.put(i, i);
-            }
+            }*/
 
         } else {
             try {
@@ -119,6 +123,7 @@ public class HotBF {
                         Scaled = Scales[i];
                 }
                 // BLockLRU
+                // 
                 BlockLRU=new ConcurrentLinkedHashMap.Builder<Integer,Integer>().maximumWeightedCapacity(BlockNumber*(Scaled+1)).build();
                 String queue = br.readLine();
                 String[] q = queue.split(" ");
@@ -126,8 +131,13 @@ public class HotBF {
                     BlockLRU.put(Integer.valueOf(s),Integer.valueOf(s));
                 }
                 
+                //GlobalAccess
+                String global=br.readLine();
+                GlobalAccess=Integer.valueOf(global);
+
+
                 // add Scaled Blocks
-                // entitis | active BFUs
+                // entitis | Access | active BFUs
                 // BFULRU
                 // load in active BFU
                 for (int i = 0; i <= Scaled; i++) {
@@ -207,6 +217,8 @@ public class HotBF {
             }
             bw.write("\n");
 
+            bw.write(GlobalAccess+"\n");
+
             for (int i = 0; i < BlockMap.size(); i++) {
                 BlockMap.get(i).savemeta(bw);
             }
@@ -275,7 +287,7 @@ public class HotBF {
         return BlockLRU;
     }
 
-    /*public void Eliminated(int numbers) {
+    public void Eliminated(int numbers) {
         Timer.Context c = eliminateT.time();
         // choose from numbers oldest Block(with BFUs>0 in memory),everyone choose
         // oldest BFU to remove
@@ -337,9 +349,8 @@ public class HotBF {
         }
         c.close();
     }
-*/
 //Eliminate scheme2,Eliminate LRU Blocks
-public void Eliminated(int numbers) {
+/*public void Eliminated(int numbers) {
     Set<Integer> lru = BlockLRU.ascendingKeySet();
     Iterator<Integer> it = lru.iterator();
     int totalremoved=0;
@@ -356,7 +367,8 @@ public void Eliminated(int numbers) {
         }
     }
 }
-    // Total Active BFUs in memory
+*/  
+// Total Active BFUs in memory
     public int TotalActives() {
         Timer.Context c = totalActiveT.time();
         int result = 0;
@@ -433,16 +445,45 @@ public void Eliminated(int numbers) {
             int currentBlock = i * BlockNumber + prefix;
             // update BlockLRU
             Timer.Context ctx=BlockLRUT.time();
-            //BlockLRU.remove(currentBlock);
-            //BlockLRU.add(currentBlock);
-            BlockLRU.get(currentBlock);
             ctx.close();
             // Timer.Context ctx=t2.time();
-            mayExistsResponce result = BlockMap.get(currentBlock).mayExists(address);
+            GroupBloomFilter gb=BlockMap.get(currentBlock);
+            mayExistsResponce result = gb.mayExists(address);
             // ctx.close();
-            // any block load in new BFU
+            
+            if(remainder < result.loadedin.size()){
+                double DecreasedFPR=gb.FPR()-gb.FPR(result.loadedin.size()+gb.Actives());
+                double IncreasedFPR=0.0;
+                int ElimatedBFU=0;
 
-            TryEliminate += result.loadin;
+                Set<Integer> lru = BlockLRU.ascendingKeySetWithLimit(10);
+                Iterator<Integer> it=lru.iterator();
+                while (it.hasNext()) {
+                    int t = it.next();
+                    GroupBloomFilter gbt=BlockMap.get(t);
+                    if (gbt != null && gbt.Actives() > 0) {
+                        IncreasedFPR=gbt.FPR(gbt.Actives()-1)-gbt.FPR();
+                        ElimatedBFU++;
+                        if(ElimatedBFU >= result.loadedin.size()){
+                            if(DecreasedFPR > IncreasedFPR){
+                                it=lru.iterator();
+                                while(it.hasNext()){
+                                    t=it.next();
+                                    gbt=BlockMap.get(t);
+                                    if(gbt != null && gbt.Actives()>0){
+                                        gbt.EliminateBFU(1);
+                                        ElimatedBFU--;
+                                        if(ElimatedBFU==0){
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            TryEliminate += result.loadedin.size();
             if (result.exists == true) {
                 Result = true;
                 break;

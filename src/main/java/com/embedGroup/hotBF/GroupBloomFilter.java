@@ -35,6 +35,7 @@ public class GroupBloomFilter {
     private int Capacity;// M*(ln2)^2 / |lnP|
     private int Entities;// current number of enttities inseted to group bloom filter
     HotBF hot;
+    public int Access=0;
 
     private boolean[] Active;// true if BFU in memory
     private int Actives;// BFU numbers in memory
@@ -53,6 +54,7 @@ public class GroupBloomFilter {
     public static Timer mayexixsts1T = metrics.timer("Group mayExixsts 1");
     public static Timer mayexixsts2T = metrics.timer("Group mayExixsts 2");
 
+    final double e= 2.7182818285;
     // Deque
     ConcurrentLinkedDeque<Integer> BFULRU = new ConcurrentLinkedDeque<>();// BFULRU was born empty
 
@@ -67,7 +69,6 @@ public class GroupBloomFilter {
 
         BFUnits = K / hashFunctions;
         Size = BFUsize * BFUnits;
-        double e = 2.7182818285;
         Capacity = (int) (Size * Math.pow((Math.log(2) / Math.log(e)), 2) / Math.abs((Math.log(P) / Math.log(e))));
 
         Active = new boolean[BFUnits];
@@ -133,9 +134,11 @@ public class GroupBloomFilter {
     }
 
     public void loadmeta(String meta1, String meta2) {
-        // meta1,entites | active
+        // meta1,entites | Access | active
         String[] m1 = meta1.split(" ");
         Entities = Integer.valueOf(m1[0]);
+        Access=Integer.valueOf(m1[1]);
+
         for (int i = 1; i < m1.length; i++) {
             Active[Integer.valueOf(m1[i])] = true;
             Actives++;
@@ -152,6 +155,8 @@ public class GroupBloomFilter {
     public void savemeta(BufferedWriter bw) {
         try {
             bw.write(String.valueOf(Entities) + " ");
+            bw.write(String.valueOf(Access)+" ");
+            
             for (int i = 0; i < BFUnits; i++) {
                 if (Active[i])
                     bw.write(String.valueOf(i) + " ");
@@ -263,6 +268,15 @@ public class GroupBloomFilter {
         }
     }
 
+    public double FPR(){
+        return Math.pow(1-Math.pow(e, -1*HashFunctions*Entities/Size),HashFunctions*Actives);
+    }
+    public double FPR(int actives){
+        return Math.pow(1-Math.pow(e, -1*HashFunctions*Entities/Size),HashFunctions*actives);
+    }
+    public double NewFPR(int AddActives){
+        return Access*(Math.pow(hot.BFU_P, Actives) - Math.pow(hot.BFU_P, AddActives+Actives));
+    }
     /**
      * insert address to GroupBF,this will bring all BFUs into memory(if necessary)
      * 
@@ -270,6 +284,7 @@ public class GroupBloomFilter {
      */
     public int Insert(String address) {
         Timer.Context c = insertT.time();
+        Access++;
         int loadin = 0;
         // load all BFU into memory
         for (int i = 0; i < BFUnits; i++) {
@@ -303,12 +318,12 @@ public class GroupBloomFilter {
 
     public class mayExistsResponce {
         boolean exists;
-        int loadin;
-
-        mayExistsResponce(boolean r, int l) {
-            exists = r;
-            loadin = l;
+        HashMap<Integer, BloomFilter<String>> loadedin;
+        mayExistsResponce(boolean exist, HashMap<Integer,BloomFilter<String>> load) {
+            exists = exist;
+            loadedin = load;
         }
+
     }
 
     public static int loadtimes = 0;
@@ -318,9 +333,10 @@ public class GroupBloomFilter {
      * negative result is obtained, move the corresponding BFU to the MRU end,
      * otherwise no change is made Load in checked unactive BFU
      */
-    /*
+    
      public mayExistsResponce mayExists(String address) {
         Timer.Context c = mayexistsT.time();
+        Access++;
         try {
             int[] keys = getHashValues(address);
 
@@ -340,13 +356,13 @@ public class GroupBloomFilter {
                                 BFULRU.add(i);
                             }
                             // get result;
-                            return (new mayExistsResponce(false, 0));
+                            return (new mayExistsResponce(false, null));
                         }
                     }
                 }
                 // else,need to bring other BFUs into memory
                 if (Actives == BFUnits)
-                    return (new mayExistsResponce(true, 0));
+                    return (new mayExistsResponce(true, null));
             } finally {
                 c1.close();
             }
@@ -378,29 +394,29 @@ public class GroupBloomFilter {
                             // The one who contributed
                             BFULRU.remove(i);
                             BFULRU.add(i);
-                            Group.put(i, bf);
-                            return (new mayExistsResponce(false, 1));
+                            //Group.put(i, bf);
+                            return (new mayExistsResponce(false, loadedin));
                         }
 
                     }
                 }
-                for (int i = 0; i < BFUnits; i++) {
+                /*for (int i = 0; i < BFUnits; i++) {
                     BloomFilter<String> bf = loadedin.get(i);
                     if (bf != null) {
                         Group.put(i, bf);
                     }
-                }
-                return (new mayExistsResponce(true, loadedin.size()));
+                }*/
+                return (new mayExistsResponce(true, loadedin));
             } finally {
                 c2.close();
             }
         } finally {
             c.close();
         }
-    }*/
+    }
 
     //mayexists scheme2,loadin all missing BFU
-    public mayExistsResponce mayExists(String address) {
+ /*   public mayExistsResponce mayExists(String address) {
         
         int[] keys = getHashValues(address);
         
@@ -441,7 +457,7 @@ public class GroupBloomFilter {
         }
         return (new mayExistsResponce(true, loadedin));
     }
-
+*/
     public long getOffset(int block, int Units) {
         return ((long) block * Size + Units * BFUsize) / 8;
     }

@@ -9,10 +9,16 @@ import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.embedGroup.hotBF.skewdata;
+import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import com.googlecode.concurrentlinkedhashmap.EntryWeigher;
+import com.googlecode.concurrentlinkedhashmap.Weigher;
+
+import ch.qos.logback.core.rolling.helper.IntegerTokenConverter;
 
 
 public class Test {
@@ -260,5 +266,22 @@ public class Test {
         }
     }
 
+    public static void WeightConcurrentLinkedHashMapTest(){
+        EntryWeigher<Integer, Double> weigher = new EntryWeigher<Integer, Double>() {
+            @Override public int weightOf(Integer key, Double value) {
+                return (int)value.doubleValue();
+            }
+          };
+        ConcurrentLinkedHashMap<Integer,Double> map=new ConcurrentLinkedHashMap.Builder<Integer,Double>().maximumWeightedCapacity(10).weigher(weigher).build();
+        map.put(0, 12*0.5);
+        map.put(1,6*0.5);
+        
+        Set<Integer> lru=map.ascendingKeySet();
+        Iterator<Integer> it=lru.iterator();
+        while(it.hasNext()){
+            System.out.println(it.next());
+        }
+
+    }
     
 }

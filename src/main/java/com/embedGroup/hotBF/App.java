@@ -38,12 +38,13 @@ public class App
         //MicroBenchmark.clear();
 
         //MicroBenchmark.warmup();
-        MicroBenchmark.mutithread();
+        //MicroBenchmark.mutithread();
         //MicroBenchmark.wps();
         //MicroBenchmark.ini_shutdown();
         //Test.skewnesstest();
         //MotivationTest t=new MotivationTest();
         //t.DataMarketPlaceSimu(0.0);
         //MicroBenchmark.scaleBench();
+        Test.WeightConcurrentLinkedHashMapTest();
     }
 }
