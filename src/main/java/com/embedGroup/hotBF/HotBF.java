@@ -512,7 +512,6 @@ public class HotBF {
         public void run() {
             String indertaddr=null;
             while (!exit) {
-                if(index==682)  break;
                 if(index % 1000==0){
                     System.out.println(this.getId() + " index " + index);
                     
